@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mingkwan Smart Scale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%230f1b2d'/%3E%3Ctext x='24' y='35' font-size='32' font-weight='900' text-anchor='middle' fill='%2322c55e' font-family='Arial'%3EK%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f4f6f8;--c:#fff;--t:#1d2733;--m:#6b7785;--p:#16a34a;--nv:#0f1b2d;--bl:#2563eb;--d:#dc2626;--b:#dbe1e7}
+@media(prefers-color-scheme:dark){:root{--bg:#141a20;--c:#1d252d;--t:#e8edf2;--m:#94a1ae;--b:#2c3742}}
+*{box-sizing:border-box}body{margin:0;font-family:"Prompt",system-ui,"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--t)}
+header{background:var(--nv);color:#fff;padding:8px 12px;position:sticky;top:0;z-index:5}
+header b{font-size:18px}nav{display:flex;gap:4px;margin-top:6px;overflow-x:auto}
+nav button{background:#ffffff14;color:#fff;border:0;padding:8px 14px;border-radius:8px;font-size:15px;white-space:nowrap}
+nav button.on{background:var(--bl);color:#fff;font-weight:700}
+main{max-width:1200px;margin:0 auto;padding:10px}
+section{display:none}section.on{display:block}
+.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:12px;margin-bottom:10px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+label{font-size:13px;color:var(--m);display:block}
+input,select,button,textarea{font:inherit;padding:10px;border:1px solid var(--b);border-radius:8px;background:var(--c);color:var(--t);width:100%}
+button{cursor:pointer;width:auto}.pri{background:var(--p);color:#fff;border-color:var(--p)}.dan{background:var(--d);color:#fff;border-color:var(--d)}
+.big{font-size:38px;font-weight:800;text-align:center;letter-spacing:1px}
+video{width:100%;max-height:220px;background:#000;border-radius:8px;object-fit:cover}
+.ph{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ph img{height:64px;border-radius:6px;border:1px solid var(--b)}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px;border-bottom:1px solid var(--b);text-align:left}
+td.n,th.n{text-align:right}.tot{font-size:26px;font-weight:800;color:var(--p);text-align:right}
+.bd{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;color:#fff}
+.pending{background:#e67e22}.approved{background:var(--p)}.rejected{background:var(--d)}.void{background:#777}.card{box-shadow:0 1px 3px #0001}
+.brand{display:flex;align-items:center;gap:8px}.brand b{display:block;font-size:18px;line-height:1.1}.brand small{font-size:11px;opacity:.85}
+#mb{display:none;margin-left:auto;padding:6px 12px}#lo2{padding:6px 10px}#lo{padding:6px 12px}.brand{gap:6px}#who{color:#ffffffcc;font-size:12px;margin:2px 0 0}.ng{display:none}.dsk{display:none}
+.pos{display:grid;grid-template-columns:1fr 390px;gap:12px;align-items:start}.posR{position:sticky;top:10px}
+@media(max-width:899px){.pos{grid-template-columns:1fr}.posR{position:static}}
+.cg{display:grid;grid-template-columns:140px 1fr;gap:10px}#cats{display:flex;flex-direction:column;gap:6px}.chip{border-radius:10px;text-align:left}
+@media(max-width:600px){.cg{grid-template-columns:1fr}#cats{flex-direction:row;flex-wrap:wrap}}
+.ln{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 0;border-bottom:1px solid var(--b)}.ln-name{font-weight:700}
+.pchip{background:#cfe6ff;color:#114;border-radius:99px;padding:2px 8px;font-size:12px;margin-left:6px;white-space:nowrap}
+.ln-side{grid-row:1/3;grid-column:2;display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;gap:6px}
+.ln-act{display:flex;gap:6px;align-items:center}.th{height:34px;width:34px;object-fit:cover;border-radius:6px}
+.ic{width:36px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px}.del{background:#fdecea;border-color:#f5c2c0;color:#c0392b}
+.row2{display:flex;justify-content:space-between;padding:3px 0}.big2{font-size:26px;color:var(--p);font-weight:800}
+.wd3{display:grid;grid-template-columns:230px 1fr 250px;gap:14px}@media(max-width:800px){.wd3{grid-template-columns:1fr}}
+.res{background:var(--bg);border-radius:10px;padding:10px;margin-top:8px}.res b{font-size:22px}
+button{white-space:nowrap;line-height:1.4;min-height:40px}.ic{min-height:36px}
+.khw{font:900 34px/1 "Prompt",system-ui,sans-serif;letter-spacing:2px;color:#fff}.khw i{font-style:normal;color:#22c55e}
+#who{word-break:break-all}.brand small{display:block;margin-top:2px}
+#login{background:var(--nv)!important;color:#fff}.tiles{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}@media(max-width:600px){.tiles{grid-template-columns:1fr}}
+.tile{background:#fff;color:#1d2733;border:0;border-radius:16px;padding:26px 16px;text-align:center;width:100%;white-space:normal}
+.tile .ci{width:88px;height:88px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;color:#fff}.tile b{font-size:26px;display:block}.tile span{color:#6b7785;font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px}.stat{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:12px}.stat b{font-size:26px;display:block}
+.bar{display:grid;grid-template-columns:130px 1fr 110px;gap:8px;align-items:center;padding:4px 0}.bar div{background:var(--bg);border-radius:6px;height:12px}.bar i{display:block;height:100%;background:var(--bl);border-radius:6px}.bar b{text-align:right}.bt-blue{background:var(--bl);color:#fff;border-color:var(--bl)}.bt-or{background:#f59e0b;color:#fff;border-color:#f59e0b}
+.bill{background:#fffdf7;color:#222;border:1px solid #e7dfc8;border-radius:14px;box-shadow:0 2px 10px #0002}.bill input{background:#fff;color:#222;border-color:#ddd}.bill .m{color:#6b6450}
+.bh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px dashed #cfc6ad;padding-bottom:8px;margin-bottom:8px}.bno{background:#e8f0ff;color:#1e40af;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700}
+.bill .ln{border-bottom:1px dashed #cfc6ad}.bsum{border-top:2px dashed #cfc6ad;margin-top:8px;padding-top:6px}.addp{width:100%;border:2px dashed var(--bl);color:var(--bl);background:transparent;font-weight:700}
+.pth{position:relative}.pth img{height:64px;border-radius:6px;display:block}.pth button{position:absolute;top:-6px;right:-6px;width:24px;height:24px;min-height:0;padding:0;border-radius:50%;background:#dc2626;color:#fff;border:2px solid #fff;font-size:12px;line-height:1}
+@media(min-width:900px){body{display:flex}header{position:sticky;top:0;height:100vh;width:214px;flex:none;display:flex;flex-direction:column;padding:14px 10px;overflow-y:auto;scrollbar-width:none}header::-webkit-scrollbar{display:none}
+nav{flex-direction:column;gap:3px;margin-top:10px;margin-bottom:auto;overflow:visible;flex:none}nav button{text-align:left;padding:9px 12px;min-height:0;font-size:14px}
+main{flex:1;max-width:none;margin:0;align-self:flex-start;padding:18px 26px}#toast{bottom:20px}#lo,#lo2,#mb{display:none}
+.dsk{display:block;flex:none;margin-top:6px;background:#ffffff1f;color:#fff;border:0;padding:9px}.ng{display:block;font-size:11px;opacity:.75;margin:8px 0 1px}}
+@media(max-width:899px){#mb{display:inline-flex}main{padding-bottom:16px}nav{display:none;position:fixed;inset:0;background:var(--nv);margin:0;padding:112px 12px 16px;z-index:4;overflow:visible auto}
+nav.open{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}nav.open .ng{grid-column:1/-1;display:block;font-size:12px;opacity:.7;margin:6px 0 0}nav button{padding:14px 10px;font-size:15px}}
+#toast{position:fixed;inset:auto auto 84px 50%;margin:0;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border:0;border-radius:10px;max-width:92vw}
+.row{display:flex;gap:6px;align-items:end;flex-wrap:wrap}.row>*{flex:1}.row>button{flex:1 1 auto;min-width:96px}
+.m{color:var(--m);font-size:13px}
+.chip{width:auto;padding:8px 16px;border-radius:99px}.chip.on{background:var(--bl);color:#fff;border-color:var(--bl)}
+.pb{white-space:normal;overflow-wrap:anywhere;width:100%;min-height:68px;padding:10px 6px;border:1px solid #0002;border-radius:10px;font-weight:600;color:#2b2b2b}
+.wd{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:600px){.wd{grid-template-columns:1fr}}
+.np{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.np button{font-size:22px;padding:14px;width:100%}
+</style></head><body>
+
+<header><div class="brand"><div><div class="khw"><i>KH</i>W</div><small id="shopn">Mingkwan Smart Scale</small></div><button id="mb" onclick="$('nav').classList.toggle('open')" aria-label="เมนู">☰ เมนู</button><button id="lo2" onclick="chPw()" aria-label="เปลี่ยนรหัสผ่าน">🔑</button><button id="lo" onclick="logout()">ออก</button></div><div id="who"></div>
+<nav id="nav"><div class="ng" data-g="front">หน้าร้าน</div><button data-t="weigh" class="on">⚖ ชั่ง/รับซื้อ</button><button data-t="truck">🚚 ชั่งรถ (กิโลใหญ่)</button><button data-t="dash">🏠 แดชบอร์ด</button><button data-t="mine">📋 สถานะบิล</button><div class="ng" data-g="back">หลังบ้าน</div><button data-t="admin">💰 จ่ายเงิน/อนุมัติ <span id="bg"></span></button><button data-t="hist">🧾 ประวัติ/ยกเลิก</button><button data-t="audit">🔍 ตรวจสอบรูป</button><button data-t="stock">📦 สต็อก</button><button data-t="rep">📊 รายงาน</button><button data-t="prod">🏷 สินค้า/ราคา</button><button data-t="set">⚙ ผู้ใช้/ตั้งค่า</button></nav>
+<button class="dsk" onclick="chPw()">🔑 เปลี่ยนรหัสผ่าน</button><button class="dsk" onclick="logout()">ออกจากระบบ</button></header>
+<div id="login" style="position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;overflow:auto;padding:16px"><div style="width:min(760px,100%)">
+ <div style="text-align:center"><div class="khw" style="font-size:56px"><i>KH</i>W</div><div style="opacity:.85;margin-top:4px">Mingkwan Smart Scale · ระบบรับซื้อ</div></div>
+ <div id="lpre" style="text-align:center;margin-top:10px;color:#ffffffb0"></div>
+ <div id="l1" class="tiles"><button class="tile" onclick="pickRole('clerk')"><div class="ci" style="background:#2563eb"><svg width="46" height="46" viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8z"/></svg></div><b>เสมียน</b><span>บันทึกการรับซื้อสินค้า</span></button>
+  <button class="tile" onclick="pickRole('admin')"><div class="ci" style="background:#16a34a;font-size:46px">&#9881;&#xFE0E;</div><b>แอดมิน</b><span>ตรวจสอบบิล / รายงาน / จัดการระบบ</span></button></div>
+ <div id="l3" class="card" style="display:none;max-width:340px;margin:18px auto 0;color:var(--t);text-align:center"><b style="font-size:18px">กรุณาใส่รหัสแอดมิน</b><div id="pd" style="font-size:34px;letter-spacing:10px;margin:10px 0"></div><div class="np" id="pk"></div><div id="perr" class="m" style="color:var(--d);margin-top:6px"></div><button style="width:100%;margin-top:8px" onclick="showLogin()">← กลับ</button></div>
+ <div id="l2" class="card" style="display:none;max-width:360px;margin:18px auto 0;color:var(--t)"><b id="lt" style="font-size:18px"></b><label style="margin-top:8px">อีเมล</label><input id="em" type="email"><label style="margin-top:8px">รหัสผ่าน</label><input id="pw" type="password" onkeydown="if(event.key=='Enter')doLogin()">
+  <button class="pri" style="width:100%;margin-top:10px" onclick="doLogin()">เข้าสู่ระบบ</button><button style="width:100%;margin-top:6px" onclick="showLogin()">← เลือกระบบใหม่</button><div id="lerr" class="m" style="color:var(--d);margin-top:6px"></div></div></div></div>
+<main>
+<section id="weigh" class="on">
+<div class="pos"><div>
+ <div class="card" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><div><label>Baud rate</label><select id="baud"><option>9600</option><option>4800</option><option>19200</option><option>2400</option><option>115200</option></select></div>
+  <button class="pri" onclick="connectScale()">🔌 ต่อตาชั่ง</button><div id="scst" class="m" style="flex:1">ยังไม่ได้ต่อตาชั่ง (พิมพ์น้ำหนักเองได้)</div></div>
+ <div class="card cg"><div id="cats"></div><div id="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px"></div></div></div>
+ <div class="card posR bill">
+  <div class="bh"><div><b style="font-size:18px">🧾 ใบรับซื้อ</b><div class="m" id="bmeta"></div></div><span class="bno">บิลใหม่</span></div>
+  <label>ชื่อผู้ขาย</label><input id="seller" placeholder="ลูกค้าทั่วไป">
+  <div id="lines" style="min-height:110px;margin:8px 0"></div>
+  <button class="addp" onclick="addMore()">➕ เพิ่มสินค้า</button>
+  <div class="bsum"><div class="row2"><span>จำนวนรายการ</span><b id="cnt">0</b></div><div class="row2"><span>น้ำหนักสุทธิรวม</span><b id="tnet">0.00 กก.</b></div><div class="row2 big2"><span>ยอดสุทธิ</span><b id="total">฿0.00</b></div></div>
+  <div class="row" style="margin-top:10px"><button class="dan" style="flex:1" onclick="cancelBill()">ยกเลิกบิล</button><button class="pri" style="flex:2;font-size:18px" onclick="saveBill()">💾 บันทึก / ส่งจ่าย</button></div></div></div>
+<dialog id="wd" style="max-width:860px;width:96%;border-radius:12px;background:var(--c);color:var(--t)">
+ <div><b id="wt" style="font-size:22px"></b> <span class="m" id="wp"></span></div><select id="pid" hidden></select>
+ <div class="wd3" style="margin-top:10px">
+  <div><video id="vid" autoplay playsinline muted></video><button style="width:100%;margin-top:6px" onclick="snap()">📷 ถ่ายเพิ่ม</button><div class="ph" id="phs"></div></div>
+  <div><div class="m">ค่าจากตาชั่ง (กก.)</div><div class="big" id="live" style="font-size:30px">0.00</div>
+   <label>น้ำหนักรวม (กก.)</label><input id="gross" type="number" step="0.01" inputmode="none" oninput="calc()" style="font-size:26px;font-weight:700">
+   <button style="width:100%;margin:6px 0" onclick="useLive()">⬇ ใช้ค่าจากตาชั่ง</button>
+   <div class="g"><div><label>ภาชนะ/ตะกร้า</label><select id="tareSel" onchange="calc()"></select></div><div><label>จำนวนภาชนะ</label><input id="tareQ" type="number" value="1" min="0" oninput="calc()"></div>
+   <div><label>หักเพิ่ม (กก.)</label><input id="tareX" type="number" step="0.01" value="0" oninput="calc()"></div><div><label>เจือปน (%)</label><input id="pct" type="number" step="0.1" value="0" oninput="calc()"></div></div>
+   <div class="res"><div class="row2"><span>น้ำหนักสุทธิ</span><b><span id="rnet">0.00</span> กก.</b></div><div class="row2"><span>จ่ายทั้งหมด</span><b id="ramt" style="color:var(--p)">฿0.00</b></div><div id="prev" class="m"></div></div></div>
+  <div><div class="np" id="npad"></div></div></div>
+ <div class="row" style="margin-top:10px"><button style="flex:1" onclick="$('wd').close()">ยกเลิก</button><button class="pri" style="flex:2" onclick="addLine()">✔ ยืนยัน เพิ่มในบิล</button></div>
+</dialog></section>
+<section id="admin"></section><section id="audit"></section><section id="stock"></section><section id="dash"></section><section id="mine"></section><section id="truck"></section><section id="hist"></section><section id="prod"></section><section id="rep"></section><section id="set"></section>
+</main><div id="toast" popover="manual"></div>
+<script>
+// ---------- helpers ----------
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f2=n=>(+n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const r2=n=>Math.round((n+Number.EPSILON)*100)/100,uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function toast(m){const t=$('toast');t.textContent=m;try{t.hidePopover()}catch(e){}try{t.showPopover()}catch(e){}clearTimeout(toast.h);toast.h=setTimeout(()=>{try{t.hidePopover()}catch(e){}},3000)}
+addEventListener('unhandledrejection',e=>{toast('ผิดพลาด: '+(e.reason?.message||e.reason));e.preventDefault()});addEventListener('error',e=>toast('ผิดพลาด: '+e.message));
+function dlg(title,{input=false,ok='ตกลง',danger=false,no='ยกเลิก',body='',ph='ระบุเหตุผล'}={}){return new Promise(r=>{const d=document.createElement('dialog');d.style.cssText='max-width:420px;width:92%;border-radius:12px;background:var(--c);color:var(--t)';
+ d.innerHTML=`<b>${esc(title)}</b>${body}${input?'<textarea id="di" rows="3" style="margin-top:8px" placeholder="${esc(ph)}"></textarea>':''}<div class="row" style="margin-top:10px"><button id="dn">${no}</button><button id="dk" class="${danger?'dan':'pri'}">${ok}</button></div>`;
+ document.body.appendChild(d);d.showModal();const done=v=>{d.remove();r(v)};d.oncancel=()=>done(null);d.querySelector('#dn').onclick=()=>done(null);
+ d.querySelector('#dk').onclick=()=>{const v=input?d.querySelector('#di').value.trim():true;if(input&&!v)return d.querySelector('#di').focus();done(v)}})}
+const sb=supabase.createClient('https://sunifccylaokivalwjic.supabase.co','sb_publishable_mNYJioB49fgTQZZzQq3zgg_QpA0fu2n');
+let ME=null,T=[],saving=false;const TABS={clerk:['weigh','truck','dash','mine'],cashier:['dash','admin','hist','stock','rep'],admin:['weigh','truck','dash','admin','hist','audit','stock','rep','prod','set']},RL={clerk:'User (เสมียน)',cashier:'ผู้จ่ายเงิน/บัญชี',admin:'Admin'},can=t=>TABS[ME?.role]?.includes(t),FRONT=['weigh','truck','dash','mine'];
+let S={shop:'Mingkwan Smart Scale',recorder:'พนักงาน 1',pin:'1234',tares:'ตะกร้าเล็ก:1.2,ตะกร้าใหญ่:2.5,กระสอบ:0.3',unit:'kg'};
+let P=[],B=[],cur={lines:[],photos:[]},adm=false,cash=false,stream=null,liveW=0,lastPend=-1;
+// ---------- auth / init ----------
+let want=null,PRE=null,pin='',pinFail=0,pinLock=0;
+function showLogin(msg){$('login').style.display='flex';$('l3').style.display='none';$('lpre').textContent=PRE?'เข้าสู่ระบบอยู่: '+PRE.name:'';$('l1').style.display=msg?'none':'';$('l2').style.display=msg?'block':'none';$('lerr').textContent=msg||''}
+async function pickRole(r){
+ if(PRE){if((r=='clerk')!=(PRE.role=='clerk')){want=r;PRE=null;$('l1').style.display='none';$('l2').style.display='block';$('lt').textContent='เข้าสู่ระบบ'+(r=='clerk'?'เสมียน':'แอดมิน');$('lerr').textContent='บัญชีที่เข้าอยู่ไม่ตรงกับระบบที่เลือก ล็อกอินด้วยบัญชีอื่นได้';return}
+  if(r=='admin'){const{data}=await sb.rpc('has_admin_pin');if(data)return showPin()}
+  want=r;PRE=null;return boot()}
+ want=r;$('l1').style.display='none';$('l2').style.display='block';$('lt').textContent=r=='clerk'?'เข้าสู่ระบบเสมียน':'เข้าสู่ระบบแอดมิน';$('lerr').textContent='';$('em').focus()}
+function showPin(){$('l1').style.display='none';$('l2').style.display='none';$('l3').style.display='block';pin='';pinDots();$('perr').textContent='';
+ $('pk').innerHTML=['1','2','3','4','5','6','7','8','9','','0','<'].map(k=>k?`<button onclick="pinKey('${k}')">${k=='<'?'⌫':k}</button>`:'<span></span>').join('')}
+function pinDots(){$('pd').textContent='●'.repeat(pin.length)+'○'.repeat(4-pin.length)}
+async function pinKey(k){if(Date.now()<pinLock)return $('perr').textContent='ผิดหลายครั้ง กรุณารอสักครู่';if(k=='<')pin=pin.slice(0,-1);else if(pin.length<4)pin+=k;pinDots();
+ if(pin.length<4)return;const{data}=await sb.rpc('check_admin_pin',{p:pin});
+ if(data){want='admin';PRE=null;return boot()}
+ pin='';pinDots();if(++pinFail>=5){pinFail=0;pinLock=Date.now()+30000;$('perr').textContent='ผิดหลายครั้ง รอ 30 วินาที'}else $('perr').textContent='รหัสไม่ถูกต้อง'}
+async function doLogin(){PRE=null;$('lerr').textContent='';const{error}=await sb.auth.signInWithPassword({email:$('em').value.trim(),password:$('pw').value});if(error)return $('lerr').textContent='เข้าสู่ระบบไม่สำเร็จ: '+error.message;boot()}
+async function logout(){await sb.auth.signOut();location.reload()}
+async function boot(){try{Object.assign(S,JSON.parse(localStorage.getItem('mk_set')||'{}'))}catch(e){}if(S.shop=='ร้านรับซื้อของเก่า')S.shop='Mingkwan Smart Scale';
+ const{data:{session}}=await sb.auth.getSession();if(!session)return showLogin();
+ const{data:me,error}=await sb.from('profiles').select('*').eq('id',session.user.id).single();if(error)return showLogin();
+ if(me.active===false){await sb.auth.signOut();return showLogin('บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อแอดมิน')}
+ if(want&&(want=='clerk')!=(me.role=='clerk')){const w=want;want=null;await sb.auth.signOut();return showLogin(w=='clerk'?'บัญชีนี้เป็นแอดมิน กรุณากลับไปเลือก "แอดมิน"':'บัญชีนี้เป็นเสมียน กรุณากลับไปเลือก "เสมียน"')}
+ if(!want){PRE=me;return showLogin()}
+ ME=me;S.recorder=me.name;adm=me.role=='admin';cash=me.role!='clerk';$('login').style.display='none';$('who').innerHTML=esc(me.name)+'<br>'+RL[me.role];$('shopn').textContent=S.shop;
+ document.querySelectorAll('nav button').forEach(b=>{if(!can(b.dataset.t))b.style.display='none'});document.querySelectorAll('.ng').forEach(g=>{g.style.display=TABS[ME.role].some(t=>(g.dataset.g=='front')==FRONT.includes(t))?'':'none'});
+ await loadAll();
+ sb.channel('bills-live').on('postgres_changes',{event:'*',schema:'public',table:'bills'},async()=>{await loadB();if(cash&&$('admin').classList.contains('on'))rAdmin(true);if($('mine').classList.contains('on'))rMine();if($('dash').classList.contains('on'))rDash()}).subscribe();document.querySelector('nav button[data-t="'+TABS[ME.role][0]+'"]').click()}
+async function loadAll(){const[p,t]=await Promise.all([sb.from('products').select('*').eq('active',true).order('sort_order').order('code'),sb.from('tare_presets').select('*').order('name')]);
+ P=(p.data||[]).map(x=>({id:x.id,code:x.code,name:x.name,price:+x.price_per_kg,cat:x.category||'อื่นๆ',color:x.color}));T=(t.data||[]).map(x=>({id:x.id,n:x.name,w:+x.weight_kg}));fillSel();await loadB()}
+const BSEL='*,bill_items(*),rec:profiles!bills_recorder_id_fkey(name),pay:profiles!bills_approved_by_fkey(name),vby:profiles!bills_voided_by_fkey(name)';
+function mapBill(b){return{id:b.id,no:b.bill_no,ts:Date.parse(b.created_at),seller:b.seller_name,recorder:b.rec?.name||'',total:+b.total,status:b.status,audit:b.audit,anote:b.audit_note,apts:b.approved_at?Date.parse(b.approved_at):0,payer:b.pay?.name||'',vr:b.void_reason,vts:b.voided_at?Date.parse(b.voided_at):0,vby:b.vby?.name||'',arch:b.archived,lines:b.bill_items.map(i=>({name:i.product_name,price:+i.price_per_kg,gross:+i.gross_kg,tare:+i.tare_kg,pct:+i.impurity_pct,net:+i.net_kg,amount:+i.amount}))}}
+let HB=[];
+async function loadB(){const{data,error}=await sb.from('bills').select(BSEL).order('created_at',{ascending:false}).limit(300);
+ if(error)return toast('โหลดบิลไม่ได้: '+error.message);
+ B=data.map(mapBill);
+ const n=B.filter(b=>b.status=='pending').length;$('bg').textContent=cash&&n?'('+n+')':'';if(cash&&lastPend>=0&&n>lastPend)toast('🔔 มีบิลใหม่รออนุมัติ');lastPend=n}
+function tares(){return T}
+function fillSel(){renderPos();$('pid').innerHTML=P.map(p=>`<option value="${p.id}">${esc(p.code)} · ${esc(p.name)} (฿${p.price}/กก.)</option>`).join('');
+ $('tareSel').innerHTML='<option value="0">ไม่หัก</option>'+tares().map(t=>`<option value="${t.w}">${esc(t.n)} (${t.w} กก.)</option>`).join('')}
+// ---------- tabs ----------
+$('nav').onclick=async e=>{const t=e.target.closest('button')?.dataset.t;if(!t)return;
+ if(!can(t))return;$('nav').classList.remove('open');
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));
+ document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==t));
+ ({admin:rAdmin,audit:rAudit,stock:rStock,dash:rDash,mine:rMine,truck:rTruck,hist:rHist,prod:rProd,rep:rRep,set:rSet}[t]||(()=>{}))()};
+// ---------- camera ----------
+async function startCam(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});$('vid').srcObject=stream}catch(e){toast('เปิดกล้องไม่ได้: '+e.message)}}
+function snap(){const v=$('vid');if(!v.videoWidth)return toast('ยังไม่ได้เปิดกล้อง');const c=document.createElement('canvas'),w=Math.min(800,v.videoWidth);c.width=w;c.height=v.videoHeight*w/v.videoWidth;
+ const x=c.getContext('2d');x.drawImage(v,0,0,c.width,c.height);x.fillStyle='#000a';x.fillRect(0,c.height-22,c.width,22);x.fillStyle='#fff';x.font='14px sans-serif';x.fillText(new Date().toLocaleString('th-TH')+' · น้ำหนัก '+f2(liveW),6,c.height-6);
+ wph.push(c.toDataURL('image/jpeg',.6));rPh()}
+let wph=[];
+function rPh(){$('phs').innerHTML=wph.map((p,i)=>`<div class="pth"><img src="${p}"><button aria-label="ลบรูป" onclick="delPh(${i})">✕</button></div>`).join('')}
+function delPh(i){wph.splice(i,1);rPh()}
+// ---------- scale (Web Serial) ----------
+async function connectScale(){if(!('serial' in navigator))return toast('เบราว์เซอร์ไม่รองรับ Web Serial (ใช้ Chrome/Edge บนคอม หรือใช้ตัวแปลง Bluetooth/ Bridge)');
+ try{const p=await navigator.serial.requestPort();await p.open({baudRate:+$('baud').value});$('scst').textContent='✅ เชื่อมต่อแล้ว';
+  const dec=new TextDecoderStream();p.readable.pipeTo(dec.writable);const rd=dec.readable.getReader();let buf='';
+  for(;;){const{value,done}=await rd.read();if(done)break;buf+=value;const ps=buf.split(/[\r\n]+/);buf=ps.pop();
+   for(const l of ps){const m=l.match(/(\d+(?:\.\d+)?)/);if(m){liveW=S.unit=='g'?+m[1]/1000:+m[1];$('live').textContent=f2(liveW)}}}}
+ catch(e){$('scst').textContent='❌ '+e.message}}
+function useLive(){$('gross').value=liveW;calc()}
+// ---------- POS ----------
+let curCat=null,CATS=[];
+function setCat(i){curCat=CATS[i];renderPos()}
+function renderPos(){CATS=[...new Set(P.map(p=>p.cat))];if(!CATS.includes(curCat))curCat=CATS[0];
+ $('cats').innerHTML=CATS.map((c,i)=>`<button class="chip${c==curCat?' on':''}" onclick="setCat(${i})">${esc(c)}</button>`).join('');
+ $('grid').innerHTML=P.filter(p=>p.cat==curCat).map(p=>`<button class="pb" style="background:${esc(p.color||'#e9ecef')}" onclick="openW('${p.id}')">${esc(p.name)}<br><small>฿${f2(p.price)}/กก.</small></button>`).join('')||'<span class="m">ยังไม่มีสินค้าในหมวดนี้</span>';
+ $('npad').innerHTML=['7','8','9','4','5','6','1','2','3','.','0','<'].map(k=>`<button onclick="pad('${k}')">${k=='<'?'⌫':k}</button>`).join('')+'<button style="grid-column:1/-1;background:#ffc9c9" onclick="pad(\'C\')">ล้าง</button>'}
+function pad(k){const g=$('gross');let v=g.value;if(k=='C')v='';else if(k=='<')v=v.slice(0,-1);else if(k=='.'){if(!v.includes('.'))v=(v||'0')+'.'}else v+=k;g.value=v;calc()}
+async function openW(id){const p=P.find(x=>x.id==id);$('pid').value=id;$('wt').textContent=p.name;$('wp').textContent='฿'+f2(p.price)+'/กก.';
+ wph=[];rPh();$('gross').value='';$('tareX').value=0;$('pct').value=0;calc();$('wd').showModal();
+ if(!stream)await startCam();if(stream){const v=$('vid');v.srcObject=stream;v.play().catch(()=>{})}}
+// ---------- weigh ----------
+function byCode(){const c=$('code').value.trim().toLowerCase(),p=P.find(x=>x.code.toLowerCase()==c);if(p){$('pid').value=p.id;calc()}}
+function calcLine(){const p=P.find(x=>x.id==$('pid').value);if(!p)return null;const g=+$('gross').value||0,tare=r2((+$('tareSel').value||0)*(+$('tareQ').value||0)+(+$('tareX').value||0)),pct=+$('pct').value||0,
+ net=r2(Math.max(0,(g-tare)*(1-pct/100)));return{pid:p.id,code:p.code,name:p.name,price:p.price,gross:g,tare,pct,net,amount:r2(net*p.price)}}
+function calc(){const l=calcLine();$('prev').textContent=l?`หักภาชนะ ${f2(l.tare)} กก. · ฿${(l.price/1000).toFixed(3)}/กรัม`:'';$('rnet').textContent=l?f2(l.net):'0.00';$('ramt').textContent='฿'+(l?f2(l.amount):'0.00')}
+function addLine(){const l=calcLine();if(!l||l.gross<=0||l.net<=0)return toast('กรอกน้ำหนักให้ถูกต้อง');if(l.price<=0)return toast('สินค้านี้ยังไม่ได้ตั้งราคา (ให้แอดมินตั้งราคาก่อน)');if(!wph.length)snap();if(!wph.length)return toast('ต้องมีรูปอย่างน้อย 1 รูป (เปิดกล้องแล้วกดถ่าย)');l.photos=[...wph];l.photo=l.photos[0];cur.lines.push(l);wph=[];rPh();$('gross').value='';$('wd').close();rLines()}
+const TRASH=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>`;
+function rLines(){$('bmeta').textContent=new Date().toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})+' · ผู้ชั่ง: '+(ME?.name||'');const t=cur.lines.reduce((a,l)=>a+l.amount,0),n=cur.lines.reduce((a,l)=>a+l.net,0);
+ $('lines').innerHTML=cur.lines.map((l,i)=>`<div class="ln"><div><div class="ln-name">${i+1}. ${esc(l.name)}<span class="pchip">฿${f2(l.price)}/กก.</span></div><div class="m">รวม ${f2(l.gross)} · หัก ${f2(l.tare)}${l.pct?' · เจือปน '+l.pct+'%':''} = <b>${f2(l.net)}</b> กก.</div></div>
+ <div class="ln-side"><b>฿${f2(l.amount)}</b><div class="ln-act">${l.photo?`<img class="th" src="${l.photo}">`:''}<button class="ic del" aria-label="ลบรายการ" onclick="delLine(${i})">${TRASH}</button></div></div></div>`).join('')||'<div class="m" style="text-align:center;padding:24px 0">กดสินค้าทางซ้ายเพื่อเริ่มชั่ง</div>';
+ $('cnt').textContent=cur.lines.length;$('tnet').textContent=f2(n)+' กก.';$('total').textContent='฿'+f2(t)}
+async function delLine(i){if(await dlg('ลบรายการ "'+cur.lines[i].name+'" ออกจากบิล?',{ok:'ลบ',danger:true})){cur.lines.splice(i,1);rLines()}}
+async function addMore(){const p=await pickProd();if(p)openW(p.id)}
+async function cancelBill(){if(!cur.lines.length&&!$('seller').value)return;if(await dlg('ล้างบิลนี้ทั้งหมด?',{ok:'ล้างบิล',danger:true}))resetBill()}
+function resetBill(){cur={lines:[],photos:[]};$('seller').value='';rLines();rPh()}
+async function saveBill(){if(saving)return;if(!cur.lines.length)return toast('ยังไม่มีรายการ');saving=true;
+ try{const total=r2(cur.lines.reduce((a,l)=>a+l.amount,0));
+ const{data:b,error}=await sb.from('bills').insert({seller_name:$('seller').value.trim()||'ลูกค้าทั่วไป',total}).select().single();if(error)throw error;
+ const{error:e2}=await sb.from('bill_items').insert(cur.lines.map(l=>({bill_id:b.id,product_id:l.pid,product_name:l.name,price_per_kg:l.price,gross_kg:l.gross,tare_kg:l.tare,impurity_pct:l.pct,net_kg:l.net,amount:l.amount})));if(e2)throw e2;
+ for(const[i,l]of cur.lines.entries())for(const[j,p]of(l.photos||[l.photo]).entries()){const path=b.id+'/l'+i+'_'+j+'.jpg',{error:e3}=await sb.storage.from('bill-photos').upload(path,await(await fetch(p)).blob(),{contentType:'image/jpeg'});if(e3)toast('อัปโหลดรูปไม่สำเร็จ: '+e3.message);else await sb.from('bill_photos').insert({bill_id:b.id,path,product_name:l.name})}
+ toast('บันทึกบิล '+b.bill_no+' แล้ว');resetBill();await loadB();if(await dlg('บันทึกบิล '+b.bill_no+' แล้ว ส่งให้ผู้จ่ายเงินเรียบร้อย',{ok:'🖨 พิมพ์ใบรับ',no:'ปิด'}))printBill(b.id)}catch(e){toast('บันทึกไม่สำเร็จ: '+e.message)}finally{saving=false}}
+// ---------- admin ----------
+function rAdmin(soft){if(soft&&document.querySelector('#bdlg[open]'))return;const el=$('admin');
+ el.innerHTML='<div class="card"><label>สถานะ</label><select id="fs" onchange="rAdmin()"><option value="pending">รออนุมัติ</option><option value="">ทั้งหมด</option><option value="approved">อนุมัติแล้ว</option><option value="rejected">ปฏิเสธ</option><option value="void">ยกเลิก</option></select><label style="margin-top:6px">ผู้ชั่ง</label><select id="fw"></select></div><div id="bl"></div>';
+ const fs=el.dataset.fs??'pending',fw=el.dataset.fw||'';$('fs').value=fs;$('fs').onchange=()=>{el.dataset.fs=$('fs').value;rAdmin()};
+ $('fw').innerHTML='<option value="">ทุกคน</option>'+[...new Set(B.map(b=>b.recorder).filter(Boolean))].map(n=>`<option${n==fw?' selected':''}>${esc(n)}</option>`).join('');$('fw').onchange=()=>{el.dataset.fw=$('fw').value;rAdmin()};
+ $('bl').innerHTML=B.filter(b=>(!fs||b.status==fs)&&(!fw||b.recorder==fw)).map(b=>`<div class="card" onclick="showBill('${b.id}')" style="cursor:pointer"><b>${b.no}</b> <span class="bd ${b.status}">${{pending:'รอจ่าย',approved:'จ่ายแล้ว',rejected:'ปฏิเสธ',void:'ยกเลิก'}[b.status]}</span><div class="m">${esc(b.seller)} · ผู้ชั่ง: ${esc(b.recorder)} · ${new Date(b.ts).toLocaleString('th-TH')}</div><div class="tot">฿${f2(b.total)}</div></div>`).join('')||'<div class="m">ไม่มีรายการ</div>'}
+async function showBill(id){const b=B.find(x=>x.id==id)||HB.find(x=>x.id==id);let d=document.createElement('dialog');d.id='bdlg';d.style.cssText='max-width:640px;width:95%;border-radius:12px;background:var(--c);color:var(--t)';
+ d.innerHTML=`<b>บิล ${b.no}</b><div class="m">${esc(b.seller)} · ผู้ชั่ง: ${esc(b.recorder)}${b.payer?' · จ่ายโดย '+esc(b.payer):''}</div><div class="ph" id="dph"><span class="m">กำลังโหลดรูป...</span></div>
+ <table><tr><th>สินค้า</th><th class="n">รวม</th><th class="n">หัก</th><th class="n">สุทธิ</th><th class="n">฿/กก.</th><th class="n">เงิน</th></tr>${b.lines.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${f2(l.gross)}</td><td class="n">${f2(l.tare)}</td><td class="n">${f2(l.net)}</td><td class="n">${f2(l.price)}</td><td class="n">${f2(l.amount)}</td></tr>`).join('')}</table><div class="tot">฿${f2(b.total)}</div>
+ <div class="row" style="margin-top:8px"><button onclick="this.closest('dialog').remove()">ปิด</button><button onclick="printBill('${b.id}')">🖨 ใบเสร็จ</button>${adm&&b.status!='void'?`<button class="dan" onclick="voidBill('${b.id}')">ยกเลิกบิล</button>`:''}${b.status=='pending'&&cash?`<button class="dan" onclick="setSt('${b.id}','rejected')">ปฏิเสธ</button><button class="pri" onclick="setSt('${b.id}','approved')">✔ อนุมัติ/จ่ายเงิน</button>`:''}</div>`;
+ document.body.appendChild(d);d.showModal();
+ const{data:ph}=await sb.from('bill_photos').select('path').eq('bill_id',id),box=d.querySelector('#dph');
+ if(!ph?.length){box.innerHTML='<span class="m">ไม่มีรูป</span>';return}
+ const{data:u}=await sb.storage.from('bill-photos').createSignedUrls(ph.map(x=>x.path),3600);box.innerHTML=(u||[]).map(x=>`<img src="${x.signedUrl}" style="height:110px">`).join('')}
+async function setSt(id,st){const{error}=await sb.from('bills').update({status:st,approved_by:ME.id,approved_at:new Date().toISOString()}).eq('id',id);if(error)return toast(error.message);document.getElementById('bdlg')?.remove();await loadB();rAdmin();toast('อัปเดตแล้ว')}
+function printBill(id){const b=B.find(x=>x.id==id)||HB.find(x=>x.id==id),w=window.open('','_blank','width=380,height=600');
+ w.document.write(`<html><meta charset=utf-8><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet"><body style="font:13px/1.5 Prompt,sans-serif;width:72mm"><center><b>${esc(S.shop)}</b><br>ใบรับซื้อสินค้า<br>เลขที่ ${b.no}<br>${new Date(b.ts).toLocaleString('th-TH')}</center>ผู้ขาย: ${esc(b.seller)}<br>ผู้ชั่ง: ${esc(b.recorder)}<hr>${b.lines.map(l=>`${esc(l.name)}<br>&nbsp;สุทธิ ${f2(l.net)} กก. x ${f2(l.price)} = ${f2(l.amount)}<br>&nbsp;<small>(รวม ${f2(l.gross)} หัก ${f2(l.tare)}${l.pct?' เจือปน '+l.pct+'%':''})</small><br>`).join('')}<hr><b>รวมสุทธิ ${f2(b.total)} บาท</b><br><br>ลงชื่อผู้ขาย ____________<script>document.fonts.ready.then(()=>print())<\/script>`);w.document.close()}
+// ---------- history / cancelled ----------
+let hseg='paid';
+async function rHist(){const el=$('hist'),d=el.dataset.d||new Date().toISOString().slice(0,10);el.dataset.d=d;const A=el.dataset.a=='1';
+ const seg=`<div class="card row"><button class="chip${hseg=='paid'?' on':''}" onclick="hseg='paid';rHist()">✅ จ่ายแล้ว</button>${adm?`<button class="chip${hseg=='void'?' on':''}" onclick="hseg='void';rHist()">🗑 ยกเลิก/ปฏิเสธ</button>`:''}</div>`;
+ if(hseg=='paid'){const f=new Date(d+'T00:00:00'),t=new Date(+f+864e5),{data,error}=await sb.from('bills').select(BSEL).eq('status','approved').gte('approved_at',f.toISOString()).lt('approved_at',t.toISOString()).order('approved_at',{ascending:false});
+  if(error)return el.innerHTML=seg+'<div class="card">โหลดไม่ได้: '+esc(error.message)+'<br><span class="m">ตรวจว่า Run migrate5.sql แล้ว</span></div>';
+  HB=data.map(mapBill);const show=A?HB:HB.filter(b=>!b.arch),tot=show.reduce((a,b)=>a+b.total,0);
+  el.innerHTML=seg+`<div class="card row" style="align-items:end"><div><label>วันที่จ่าย</label><input type="date" value="${d}" onchange="$('hist').dataset.d=this.value;rHist()"></div><div style="flex:2"><b>${show.length}</b> รายการ · รวมจ่าย <b style="color:var(--p);font-size:22px">฿${f2(tot)}</b></div>${adm?`<label style="display:flex;gap:6px;align-items:center;flex:0 0 auto"><input type="checkbox" style="width:auto" ${A?'checked':''} onchange="$('hist').dataset.a=this.checked?'1':'0';rHist()"> แสดงที่เคลียร์แล้ว</label><button onclick="archAll()">🧹 เคลียร์ของวันนี้</button>`:''}</div>
+  <div class="card" style="overflow-x:auto"><table><tr><th>เวลาจ่าย</th><th>เลขที่บิล</th><th>จ่ายให้</th><th>จ่ายโดย</th><th class="n">ยอด (฿)</th><th></th></tr>`+
+  (show.map(b=>`<tr style="${b.arch?'opacity:.55':''}"><td>${new Date(b.apts).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</td><td>${b.no}</td><td>${esc(b.seller)}</td><td>${esc(b.payer)}</td><td class="n"><b>${f2(b.total)}</b></td><td style="white-space:nowrap"><button onclick="showBill('${b.id}')">ดู</button>${adm&&!b.arch?` <button onclick="arch(['${b.id}'])">เคลียร์</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="m">ยังไม่มีรายการจ่ายเงินในวันนี้</td></tr>')+'</table></div>'}
+ else{const{data,error}=await sb.from('bills').select(BSEL).in('status',['void','rejected']).order('created_at',{ascending:false}).limit(200);
+  if(error)return el.innerHTML=seg+'<div class="card">'+esc(error.message)+'</div>';HB=data.map(mapBill);
+  el.innerHTML=seg+`<div class="card row" style="align-items:center"><div class="m" style="flex:3">บิลที่ยกเลิก/ถูกปฏิเสธ ลบถาวรได้ (ลบแล้วกู้คืนไม่ได้ รวมรูปภาพ)</div>${HB.length?'<button class="dan" onclick="purgeAll()">🗑 ลบทั้งหมดในรายการนี้</button>':''}</div><div class="card" style="overflow-x:auto"><table><tr><th>เวลาสร้าง</th><th>เลขที่บิล</th><th>ผู้ขาย</th><th>สถานะ</th><th>เหตุผล / ผู้ยกเลิก</th><th class="n">ยอด (฿)</th><th></th></tr>`+
+  (HB.map(b=>`<tr><td>${new Date(b.ts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</td><td>${b.no}</td><td>${esc(b.seller)}</td><td><span class="bd ${b.status}">${b.status=='void'?'ยกเลิก':'ปฏิเสธ'}</span></td><td>${esc(b.vr||'-')}<div class="m">${esc(b.vby)}${b.vts?' · '+new Date(b.vts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):''}</div></td><td class="n">${f2(b.total)}</td><td style="white-space:nowrap"><button onclick="showBill('${b.id}')">ดู</button> <button class="ic del" aria-label="ลบถาวร" onclick="purge('${b.id}')">${TRASH}</button></td></tr>`).join('')||'<tr><td colspan="7" class="m">ไม่มีรายการ</td></tr>')+'</table></div>'}}
+async function arch(ids){const{error}=await sb.from('bills').update({archived:true,archived_at:new Date().toISOString()}).in('id',ids);if(error)return toast(error.message);toast('เคลียร์แล้ว (ยังเก็บเป็นหลักฐาน)');rHist()}
+async function archAll(){const ids=HB.filter(b=>!b.arch).map(b=>b.id);if(!ids.length)return toast('ไม่มีรายการให้เคลียร์');if(await dlg('เคลียร์ '+ids.length+' รายการออกจากหน้านี้? ข้อมูลยังเก็บไว้ ดูได้ที่ "แสดงที่เคลียร์แล้ว"',{ok:'เคลียร์'}))arch(ids)}
+async function purge(id,quiet){const b=HB.find(x=>x.id==id);if(!quiet&&!await dlg('ลบบิล '+b.no+' ถาวร? กู้คืนไม่ได้ (รวมรูปภาพ)',{ok:'ลบถาวร',danger:true}))return;
+ const{data:ph}=await sb.from('bill_photos').select('path').eq('bill_id',id);if(ph?.length)await sb.storage.from('bill-photos').remove(ph.map(x=>x.path));
+ const{error}=await sb.from('bills').delete().eq('id',id);if(error)return toast('ลบไม่สำเร็จ: '+error.message);if(!quiet){toast('ลบแล้ว');loadB();rHist()}}
+async function purgeAll(){if(!await dlg('ลบบิลที่ยกเลิก/ปฏิเสธทั้งหมด '+HB.length+' รายการ ถาวร? กู้คืนไม่ได้',{ok:'ลบทั้งหมด',danger:true}))return;for(const b of [...HB])await purge(b.id,true);toast('ลบแล้ว');loadB();rHist()}
+// ---------- audit (owner) ----------
+async function rAudit(){const el=$('audit'),d=el.dataset.d||new Date().toISOString().slice(0,10);el.dataset.d=d;
+ const f=new Date(d+'T00:00:00').getTime(),bs=B.filter(b=>b.ts>=f&&b.ts<f+864e5&&['pending','approved'].includes(b.status));
+ let ph=[],U={};if(bs.length){ph=(await sb.from('bill_photos').select('bill_id,path,product_name').in('bill_id',bs.map(b=>b.id))).data||[];
+  if(ph.length)((await sb.storage.from('bill-photos').createSignedUrls(ph.map(x=>x.path),3600)).data||[]).forEach(x=>U[x.path]=x.signedUrl)}
+ const un=bs.filter(b=>b.audit=='none').length,fl=bs.filter(b=>b.audit=='flagged').length,tot=bs.reduce((a,b)=>a+b.total,0);
+ el.innerHTML=`<div class="card row"><div><label>วันที่</label><input type="date" value="${d}" onchange="$('audit').dataset.d=this.value;rAudit()"></div><div><b>${bs.length}</b> บิล · ฿${f2(tot)}</div><div>รอตรวจรูป <b>${un}</b> · พบผิดปกติ <b style="color:var(--d)">${fl}</b></div></div><div class="m" style="margin:-4px 0 8px">ตรวจรูปเทียบกับสินค้าที่เลือก (แยกจากการจ่ายเงิน) — ตรงกันกด ✅ ผิดปกติกด ⚠️</div>`+
+ bs.map(b=>`<div class="card"><b>${b.no}</b> <span class="bd ${b.status}">${b.status=='pending'?'รอจ่าย':'จ่ายแล้ว'}</span> ${b.audit=='ok'?'✅ ตรวจแล้ว':b.audit=='flagged'?'⚠️ พบผิดปกติ: '+esc(b.anote):''}
+ <div class="m">${esc(b.seller)} · เสมียน ${esc(b.recorder)} · ${new Date(b.ts).toLocaleTimeString('th-TH')}</div>
+ <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin:8px 0">${ph.filter(x=>x.bill_id==b.id).map(x=>`<div><img src="${U[x.path]}" style="width:100%;border-radius:8px;cursor:pointer" onclick="window.open(this.src)"><div style="font-size:13px"><b>${x.product_name?'ที่เลือก: '+esc(x.product_name):'รูปเพิ่มเติม'}</b></div></div>`).join('')||'<span class="m">⚠️ ไม่มีรูปในบิลนี้</span>'}</div>
+ <table>${b.lines.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">สุทธิ ${f2(l.net)} กก.</td><td class="n">฿${f2(l.amount)}</td></tr>`).join('')}</table><div class="tot">฿${f2(b.total)}</div>
+ <div class="row"><button onclick="setAudit('${b.id}','ok')">✅ ตรงกัน</button><button onclick="setAudit('${b.id}','flagged')">⚠️ ผิดปกติ</button><button class="dan" onclick="voidBill('${b.id}')">ยกเลิกบิล</button></div></div>`).join('')||'<div class="m">ไม่มีบิลในวันนี้</div>'}
+async function setAudit(id,v){let note=null;if(v=='flagged'){note=await dlg('ระบุเหตุผลที่สงสัย (เช่น รูปเป็นทองเหลือง แต่เลือกทองแดง)',{input:true,ok:'บันทึก'});if(note===null)return}
+ const{error}=await sb.from('bills').update({audit:v,audit_note:note,audited_by:ME.id,audited_at:new Date().toISOString()}).eq('id',id);if(error)return toast(error.message);await loadB();rAudit()}
+async function voidBill(id){const r=await dlg('ยกเลิกบิลนี้ (ต้องระบุเหตุผล ลบไม่ได้ ระบบเก็บประวัติไว้)',{input:true,ok:'ยกเลิกบิล',danger:true});if(!r)return;
+ const{error}=await sb.from('bills').update({status:'void',void_reason:r,voided_at:new Date().toISOString(),voided_by:ME.id}).eq('id',id);if(error)return toast(error.message);document.getElementById('bdlg')?.remove();await loadB();toast('ยกเลิกบิลแล้ว');if($('audit').classList.contains('on'))rAudit();else rAdmin()}
+// ---------- truck / big scale ----------
+let TK=null,TKL=[],TKU={};
+function shotFrom(v,w){if(!v||!v.videoWidth)return null;const c=document.createElement('canvas'),W=Math.min(800,v.videoWidth);c.width=W;c.height=v.videoHeight*W/v.videoWidth;const x=c.getContext('2d');x.drawImage(v,0,0,c.width,c.height);x.fillStyle='#000a';x.fillRect(0,c.height-22,c.width,22);x.fillStyle='#fff';x.font='14px sans-serif';x.fillText(new Date().toLocaleString('th-TH')+' · น้ำหนัก '+w+' กก.',6,c.height-6);return c.toDataURL('image/jpeg',.6)}
+async function upPhoto(d,path){const{error}=await sb.storage.from('bill-photos').upload(path,await(await fetch(d)).blob(),{contentType:'image/jpeg'});if(error)throw error;return path}
+function numDlg({title,sub='',ok='ตกลง',skip='',cam=true}){return new Promise(async r=>{const K=['7','8','9','4','5','6','1','2','3','.','0','<'],d=document.createElement('dialog');
+ d.style.cssText='max-width:480px;width:94%;border-radius:14px;background:var(--c);color:var(--t);text-align:center';
+ d.innerHTML=`<h2 style="margin:4px 0">${esc(title)}</h2><div class="m">${esc(sub)}</div>${cam?'<video autoplay playsinline muted style="margin-top:8px;max-height:150px"></video>':''}<input class="nd" inputmode="none" style="font-size:34px;font-weight:800;text-align:center;margin:8px 0"><div class="np">${K.map(k=>`<button>${k=='<'?'⌫':k}</button>`).join('')}</div><div class="row" style="margin-top:8px"><button class="b1">${skip?esc(skip):'ยกเลิก'}</button><button class="pri b2">${esc(ok)}</button></div>`;
+ document.body.appendChild(d);d.showModal();const inp=d.querySelector('.nd'),v=d.querySelector('video'),done=x=>{d.remove();r(x)};
+ d.querySelectorAll('.np button').forEach((b,i)=>b.onclick=()=>{const k=K[i];let t=inp.value;inp.value=k=='<'?t.slice(0,-1):k=='.'?(t.includes('.')?t:(t||'0')+'.'):t+k});
+ d.oncancel=()=>done(null);d.querySelector('.b1').onclick=()=>done(skip?{skip:true}:null);
+ d.querySelector('.b2').onclick=()=>{const x=parseFloat(inp.value);if(!(x>0))return toast('กรอกน้ำหนักให้ถูกต้อง');let ph=null;if(cam){ph=shotFrom(v,x);if(!ph)return toast('กล้องยังไม่พร้อม (ต้องมีรูปเป็นหลักฐาน)')}done({v:x,photo:ph})};
+ if(cam){if(!stream)await startCam();if(stream){v.srcObject=stream;v.play().catch(()=>{})}}inp.focus()})}
+function pickProd(){return new Promise(r=>{const d=document.createElement('dialog'),cats=[...new Set(P.map(p=>p.cat))];let ci=0;d.style.cssText='max-width:640px;width:96%;border-radius:14px;background:var(--c);color:var(--t)';
+ const draw=()=>{d.innerHTML=`<div class="row" style="align-items:center"><b style="font-size:20px;flex:3">เลือกหมวดหมู่</b><button class="x">✕ ปิด</button></div><div class="cg" style="margin-top:8px"><div style="display:flex;flex-direction:column;gap:6px">${cats.map((c,i)=>`<button class="chip${i==ci?' on':''}" data-i="${i}">${i+1}. ${esc(c)}</button>`).join('')}</div><div style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto">${P.filter(p=>p.cat==cats[ci]).map(p=>`<button data-p="${p.id}" style="text-align:left;background:${esc(p.color||'#eee')};color:#2b2b2b"><b>${esc(p.code)}</b> ${esc(p.name)} <small>฿${f2(p.price)}</small></button>`).join('')}</div></div>`;
+  d.querySelector('.x').onclick=()=>{d.remove();r(null)};d.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{ci=+b.dataset.i;draw()});d.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{d.remove();r(P.find(x=>x.id==b.dataset.p))})};
+ document.body.appendChild(d);draw();d.showModal();d.oncancel=()=>{d.remove();r(null)}})}
+async function rTruck(){await tkList()}
+async function tkList(){TK=null;const{data,error}=await sb.from('truck_tickets').select('*').eq('status','open').order('updated_at',{ascending:false});
+ if(error)return $('truck').innerHTML='<div class="card">โหลดไม่ได้: '+esc(error.message)+'<br><span class="m">ตรวจว่า Run migrate4.sql แล้ว</span></div>';TKL=data;
+ $('truck').innerHTML=`<div class="card row" style="align-items:center"><b style="font-size:20px;flex:3">🚚 บิลที่พักไว้ (ชั่งกิโลใหญ่)</b><button class="pri" onclick="tkOpen()">➕ เริ่มบิลรถใหม่</button></div>`+
+ (data.map(t=>{const w=t.lines.some(l=>l.net==null);return `<div class="card row" style="align-items:center;${w?'background:#fde8e8;color:#222':''}"><div style="flex:3"><b>${esc(t.plate)}</b> · ${esc(t.seller_name)}<div class="m">${t.lines.length} รายการ${w?' <b style="color:#dc2626">(มีรอชั่งรถเบา)</b>':''} · ${new Date(t.updated_at).toLocaleString('th-TH')}</div></div><button class="dan" onclick="tkOpen('${t.id}')">เปิดบิล</button>${adm?`<button class="ic del" style="flex:0" aria-label="ลบ" onclick="tkDel('${t.id}')">${TRASH}</button>`:''}</div>`}).join('')||'<div class="m" style="padding:14px">ไม่มีบิลที่พักไว้</div>')}
+function tkOpen(id){const t=id&&TKL.find(x=>x.id==id);TK=t?{id:t.id,plate:t.plate,seller:t.seller_name=='ลูกค้าทั่วไป'?'':t.seller_name,lines:t.lines,exists:true}:{id:crypto.randomUUID(),plate:'',seller:'',lines:[]};tkRender()}
+async function tkDel(id){if(!await dlg('ลบบิลที่พักไว้นี้?',{ok:'ลบ',danger:true}))return;await sb.from('truck_tickets').delete().eq('id',id);tkList()}
+function tkSync(){if($('tkp')){TK.plate=$('tkp').value.trim();TK.seller=$('tks').value.trim()}}
+async function tkSave(){tkSync();const{error}=await sb.from('truck_tickets').upsert({id:TK.id,plate:TK.plate,seller_name:TK.seller||'ลูกค้าทั่วไป',lines:TK.lines,status:'open',updated_at:new Date().toISOString()});if(error)throw error;TK.exists=true}
+async function tkRender(){const ps=TK.lines.flatMap(l=>[l.ph,l.pl]).filter(x=>x&&!TKU[x]);
+ if(ps.length)((await sb.storage.from('bill-photos').createSignedUrls(ps,3600)).data||[]).forEach(x=>TKU[x.path]=x.signedUrl);
+ const tot=TK.lines.reduce((a,l)=>a+(l.amount||0),0);
+ $('truck').innerHTML=`<div class="card"><div class="g"><div><label>ทะเบียนรถ</label><input id="tkp" value="${esc(TK.plate)}" placeholder="เช่น 1กข 1234"></div><div><label>ชื่อผู้ขาย</label><input id="tks" value="${esc(TK.seller)}" placeholder="ลูกค้าทั่วไป"></div></div></div>
+ <div class="card" style="overflow-x:auto"><table><tr><th>#</th><th>สินค้า</th><th class="n">รถหนัก</th><th class="n">รถเบา</th><th class="n">หัก</th><th class="n">สุทธิ (กก.)</th><th class="n">฿/กก.</th><th class="n">เงิน</th><th>รูป</th><th></th></tr>`+
+ TK.lines.map((l,i)=>{const w=l.net==null;return `<tr style="${w?'background:#fde8e8;color:#222':''}"><td>${i+1}</td><td>${esc(l.name)}${w?'<br><b style="color:#dc2626;font-size:12px">(รอชั่งรถเบา)</b>':''}</td><td class="n">${f2(l.heavy)}</td><td class="n">${w?'-':f2(l.light)}</td><td class="n">${w?'-':f2(l.deduct)}</td><td class="n"><b>${w?'-':f2(l.net)}</b></td><td class="n">${f2(l.price)}</td><td class="n">${w?'-':f2(l.amount)}</td><td>${[l.ph,l.pl].filter(x=>x&&TKU[x]).map(x=>`<img class="th" src="${TKU[x]}" onclick="window.open(this.src)" style="cursor:pointer">`).join(' ')}</td><td style="white-space:nowrap">${w?`<button class="bt-blue" onclick="tkLight(${i})">⚖ ชั่งรถเบา</button> `:''}<button class="ic del" aria-label="ลบ" onclick="tkDelLine(${i})">${TRASH}</button></td></tr>`}).join('')+
+ `</table><div class="tot">รวมทั้งหมด ฿${f2(tot)}</div></div><div class="card row"><button onclick="tkBack()">← กลับ</button><button class="bt-blue" onclick="tkAdd()">➕ เพิ่มสินค้า (ชั่งรถหนัก)</button><button class="bt-or" onclick="tkHold()">⏸ พักบิล</button><button class="pri" onclick="tkFinish()">✔ บันทึกการรับซื้อ</button></div>`}
+async function tkBack(){tkSync();if(TK.lines.length&&!await dlg('ออกโดยไม่พักบิล? รายการที่ยังไม่ได้พักจะหายไป',{ok:'ออก',danger:true}))return;tkList()}
+async function tkHold(){if(!TK.lines.length)return toast('ยังไม่มีรายการ');await tkSave();toast('พักบิลแล้ว');tkList()}
+async function tkAdd(){tkSync();if(!TK.plate)return toast('กรอกทะเบียนรถก่อน');const p=await pickProd();if(!p)return;if(p.price<=0)return toast('สินค้านี้ยังไม่ได้ตั้งราคา');
+ const h=await numDlg({title:'น้ำหนักรถหนัก',sub:p.name+' · กรอกน้ำหนักรถก่อนลงสินค้า (ดูจากกิโลใหญ่)'});if(!h)return;
+ const ph=await upPhoto(h.photo,`truck/${TK.id}/${Date.now()}-h.jpg`);TK.lines.push({pid:p.id,name:p.name,price:p.price,heavy:h.v,light:null,deduct:0,net:null,amount:null,ph});await tkSave();tkRender()}
+async function tkLight(i){const l=TK.lines[i],g=await numDlg({title:'น้ำหนักรถเบา',sub:l.name+' · กรอกน้ำหนักหลังลงสินค้าเสร็จ (ดูจากกิโลใหญ่)'});if(!g)return;
+ if(g.v>=l.heavy)return toast('น้ำหนักรถเบาต้องน้อยกว่ารถหนัก ('+f2(l.heavy)+')');
+ const d=await numDlg({title:'หักน้ำหนัก (ถ้ามี)',sub:'เช่น น้ำมัน พาเลท หรือกดข้ามหากไม่มี',skip:'ข้าม',cam:false});if(!d)return;const dv=d.skip?0:d.v,net=r2(l.heavy-g.v-dv);
+ if(net<=0)return toast('น้ำหนักสุทธิต้องมากกว่า 0');
+ l.pl=await upPhoto(g.photo,`truck/${TK.id}/${Date.now()}-l.jpg`);l.light=g.v;l.deduct=dv;l.net=net;l.amount=r2(net*l.price);await tkSave();
+ await dlg('✅ คำนวณน้ำหนักเรียบร้อย',{body:`<div style="text-align:left;margin:8px 0"><div class="row2"><span>น้ำหนักรถหนัก</span><b>${f2(l.heavy)} กก.</b></div><div class="row2"><span>น้ำหนักรถเบา</span><b>${f2(l.light)} กก.</b></div><div class="row2"><span>น้ำหนักหัก</span><b>${f2(l.deduct)} กก.</b></div><div class="row2" style="background:#fff3cd;color:#b45309;padding:8px;border-radius:8px;font-size:22px"><span>สุทธิ</span><b>${f2(l.net)} กก.</b></div><div class="row2"><span>เป็นเงิน</span><b>฿${f2(l.amount)}</b></div></div>`,ok:'ตกลง',no:'ปิด'});tkRender()}
+async function tkDelLine(i){if(!await dlg('ลบรายการ "'+TK.lines[i].name+'" ?',{ok:'ลบ',danger:true}))return;TK.lines.splice(i,1);if(TK.exists)await tkSave();tkRender()}
+async function tkFinish(){tkSync();if(!TK.plate)return toast('กรอกทะเบียนรถ');if(!TK.lines.length)return toast('ยังไม่มีรายการ');if(TK.lines.some(l=>l.net==null))return toast('ยังมีรายการรอชั่งรถเบา');
+ const total=r2(TK.lines.reduce((a,l)=>a+l.amount,0));if(!await dlg('บันทึกการรับซื้อ ยอดรวม ฿'+f2(total)+' ?',{ok:'บันทึก'}))return;
+ const{data:b,error}=await sb.from('bills').insert({seller_name:TK.seller||'ลูกค้าทั่วไป',note:'รถทะเบียน '+TK.plate,total}).select().single();if(error)throw error;
+ const{error:e2}=await sb.from('bill_items').insert(TK.lines.map(l=>({bill_id:b.id,product_id:l.pid,product_name:l.name,price_per_kg:l.price,gross_kg:r2(l.heavy-l.light),tare_kg:l.deduct,impurity_pct:0,net_kg:l.net,amount:l.amount})));if(e2)throw e2;
+ for(const l of TK.lines)for(const[pt,lb]of[[l.ph,' · รถหนัก'],[l.pl,' · รถเบา']])if(pt)await sb.from('bill_photos').insert({bill_id:b.id,path:pt,product_name:l.name+lb});
+ await sb.from('truck_tickets').update({plate:TK.plate,seller_name:TK.seller||'ลูกค้าทั่วไป',lines:TK.lines,status:'done',bill_id:b.id,updated_at:new Date().toISOString()}).eq('id',TK.id);
+ await loadB();if(await dlg('บันทึกบิล '+b.bill_no+' แล้ว ส่งให้ผู้จ่ายเงินเรียบร้อย',{ok:'🖨 พิมพ์ใบรับ',no:'ปิด'}))printBill(b.id);tkList()}
+// ---------- dashboard / my bills ----------
+function rDash(){const d=new Date();d.setHours(0,0,0,0);const bs=B.filter(b=>b.ts>=+d&&b.status!='void'&&b.status!='rejected'),M={};let net=0;
+ bs.forEach(b=>b.lines.forEach(l=>{M[l.name]=(M[l.name]||0)+l.amount;net+=l.net}));const top=Object.entries(M).sort((a,b)=>b[1]-a[1]).slice(0,8),mx=top[0]?.[1]||1,S_=(t,v,c)=>`<div class="stat"><span class="m">${t}</span><b${c?` style="color:${c}"`:''}>${v}</b></div>`;
+ $('dash').innerHTML=`<div class="stats">${S_('บิลวันนี้',bs.length)}${S_('ยอดซื้อรวม (฿)',f2(bs.reduce((a,b)=>a+b.total,0)),'#16a34a')}${S_('น้ำหนักสุทธิ (กก.)',f2(net))}${S_('รอจ่ายเงิน',bs.filter(b=>b.status=='pending').length,'#f59e0b')}</div>
+ <div class="card"><b>สินค้าที่รับซื้อวันนี้</b>${top.map(([n,v])=>`<div class="bar"><span>${esc(n)}</span><div><i style="width:${v/mx*100}%"></i></div><b>฿${f2(v)}</b></div>`).join('')||'<div class="m" style="padding:10px 0">ยังไม่มีรายการ</div>'}</div>`}
+function rMine(){const st={pending:['รอจ่ายเงิน','#f59e0b'],approved:['จ่ายแล้ว','#16a34a'],rejected:['ถูกปฏิเสธ','#dc2626'],void:['ยกเลิก','#777']};
+ $('mine').innerHTML='<div class="card" style="overflow-x:auto"><table><tr><th>เวลา</th><th>เลขที่</th><th>ผู้ขาย</th><th class="n">ยอด (฿)</th><th>สถานะ</th></tr>'+B.slice(0,80).map(b=>`<tr onclick="showBill('${b.id}')" style="cursor:pointer"><td>${new Date(b.ts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</td><td>${b.no}</td><td>${esc(b.seller)}</td><td class="n">${f2(b.total)}</td><td><span class="bd" style="background:${st[b.status][1]}">${st[b.status][0]}</span></td></tr>`).join('')+'</table></div>'}
+// ---------- stock ----------
+let STK=[];
+async function rStock(){const{data,error}=await sb.from('stock_summary').select('*');if(error)return $('stock').innerHTML='<div class="card">โหลดสต็อกไม่ได้: '+esc(error.message)+'<br><span class="m">ตรวจว่า Run migrate3.sql แล้ว</span></div>';
+ const M={};(data||[]).forEach(x=>M[x.product_id]=x);
+ STK=P.map(p=>{const x=M[p.id]||{net_kg:0,cost:0},kg=+x.net_kg,c=+x.cost;return{...p,kg,avg:kg?c/kg:0,val:c}});
+ $('stock').innerHTML='<div class="card"><input id="sq" placeholder="🔍 ค้นหาด้วยชื่อหรือรหัสสินค้า" oninput="stockTbl()"><div class="m" style="margin-top:6px">น้ำหนักรับเข้าสะสมจากบิลที่จ่ายเงินแล้ว (ยังไม่หักขายออก)</div></div><div class="card" style="overflow-x:auto"><table id="stt"></table></div>';stockTbl()}
+function stockTbl(){const q=($('sq')?.value||'').toLowerCase(),r=STK.filter(x=>!q||x.name.toLowerCase().includes(q)||x.code.toLowerCase().includes(q));
+ $('stt').innerHTML='<tr><th>รหัส</th><th>ชื่อสินค้า</th><th>หมวด</th><th>หน่วย</th><th class="n">น้ำหนักรับเข้า</th><th class="n">ต้นทุนเฉลี่ย ฿/กก.</th><th class="n">ราคาตั้ง ฿/กก.</th><th class="n">มูลค่า (฿)</th></tr>'+
+ r.map(x=>`<tr><td>${esc(x.code)}</td><td style="background:${esc(x.color||'#eee')};color:#2b2b2b;font-weight:600">${esc(x.name)}</td><td>${esc(x.cat)}</td><td>กก.</td><td class="n">${f2(x.kg)}</td><td class="n">${f2(x.avg)}</td><td class="n">${f2(x.price)}</td><td class="n">${f2(x.val)}</td></tr>`).join('')+
+ `<tr><th colspan="4">รวม</th><th class="n">${f2(r.reduce((a,x)=>a+x.kg,0))}</th><th></th><th></th><th class="n">${f2(r.reduce((a,x)=>a+x.val,0))}</th></tr>`}
+// ---------- products ----------
+function rProd(){$('prod').innerHTML=`<div class="card"><b>เพิ่มสินค้า</b><div class="row"><div><label>รหัส</label><input id="nc"></div><div><label>ชื่อ</label><input id="nn"></div><div><label>หมวด</label><input id="nk" placeholder="โลหะ"></div><div><label>สี</label><input id="nl" type="color" value="#e9ecef"></div><div><label>ราคา/กก.</label><input id="np" type="number" step="0.01"></div><button class="pri" onclick="addProd()">เพิ่ม</button></div></div>
+ <div class="card"><table><tr><th>รหัส</th><th>ชื่อ</th><th class="n">฿/กก.</th><th class="n">฿/กรัม</th><th></th></tr>${P.map(p=>`<tr><td>${esc(p.code)}</td><td>${esc(p.name)}</td><td class="n"><input type="number" step="0.01" value="${p.price}" style="width:90px" onchange="setPrice('${p.id}',this.value)"></td><td class="n">${(p.price/1000).toFixed(3)}</td><td><button onclick="delProd('${p.id}')">ลบ</button></td></tr>`).join('')}</table></div>`}
+async function addProd(){const code=$('nc').value.trim(),name=$('nn').value.trim();if(!code||!name)return toast('กรอกให้ครบ');const{error}=await sb.from('products').insert({code,name,price_per_kg:+$('np').value||0,category:$('nk').value.trim()||'อื่นๆ',color:$('nl').value});if(error)return toast(error.message);await loadAll();rProd()}
+async function setPrice(id,v){const{error}=await sb.from('products').update({price_per_kg:+v}).eq('id',id);if(error)return toast(error.message);await loadAll();rProd();toast('ปรับราคาแล้ว')}
+async function delProd(id){if(!await dlg('ซ่อนสินค้านี้? บิลเก่ายังอยู่ครบ',{ok:'ซ่อน',danger:true}))return;await sb.from('products').update({active:false}).eq('id',id);await loadAll();rProd()}
+// ---------- report ----------
+function rRep(){const t=new Date().toISOString().slice(0,10);$('rep').innerHTML=`<div class="card row"><div><label>จาก</label><input id="rf" type="date" value="${t}"></div><div><label>ถึง</label><input id="rt" type="date" value="${t}"></div><button class="pri" onclick="runRep()">ดูรายงาน</button><button onclick="csv()">CSV</button></div><div id="ro"></div>`;runRep()}
+function repB(){const f=new Date($('rf').value+'T00:00:00').getTime(),t=new Date($('rt').value+'T23:59:59').getTime();return B.filter(b=>b.status=='approved'&&b.ts>=f&&b.ts<=t)}
+function runRep(){const bs=repB(),m={};bs.forEach(b=>b.lines.forEach(l=>{m[l.name]=m[l.name]||{net:0,amt:0};m[l.name].net+=l.net;m[l.name].amt+=l.amount}));
+ $('ro').innerHTML=`<div class="card"><b>สรุป ${bs.length} บิล</b><div class="tot">฿${f2(bs.reduce((a,b)=>a+b.total,0))}</div><table><tr><th>สินค้า</th><th class="n">น้ำหนักสุทธิ (กก.)</th><th class="n">เป็นเงิน</th></tr>${Object.entries(m).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${f2(v.net)}</td><td class="n">${f2(v.amt)}</td></tr>`).join('')}</table></div>`}
+function csv(){const rows=[['เลขที่','วันที่','ผู้ขาย','ผู้บันทึก','สินค้า','น้ำหนักรวม','หัก','สุทธิ','ราคา/กก.','เงิน']];repB().forEach(b=>b.lines.forEach(l=>rows.push([b.no,new Date(b.ts).toLocaleString('th-TH'),b.seller,b.recorder,l.name,l.gross,l.tare,l.net,l.price,l.amount])));
+ dl('report.csv','\ufeff'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n'),'text/csv')}
+function dl(n,t,ty){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:ty}));a.download=n;a.click()}
+// ---------- settings ----------
+function rSet(){$('set').innerHTML=`<div class="card g"><div><label>ชื่อร้าน (บนใบเสร็จ)</label><input id="s1" value="${esc(S.shop)}"></div><div><label>หน่วยที่ตาชั่งส่งมา</label><select id="s5"><option value="kg">กิโลกรัม</option><option value="g">กรัม</option></select></div></div>
+<div class="card"><b>ภาชนะ/ตะกร้า</b><table>${T.map(t=>`<tr><td>${esc(t.n)}</td><td class="n">${t.w} กก.</td><td><button onclick="delTare('${t.id}')">ลบ</button></td></tr>`).join('')}</table>
+<div class="row"><div><label>ชื่อ</label><input id="tn"></div><div><label>น้ำหนัก (กก.)</label><input id="tw" type="number" step="0.001"></div><button class="pri" onclick="addTare()">เพิ่ม</button></div></div>
+<div class="card"><button class="pri" onclick="saveSet()">บันทึกตั้งค่า</button></div>`;$('s5').value=S.unit;$('set').insertAdjacentHTML('beforeend','<div class="card"><b>ผู้ใช้งาน</b><div id="ul"></div><div class="m" style="margin-top:6px">ผู้ใช้ใหม่เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่ตั้งไว้</div></div>');loadUsers();pinCard()}
+function chPw(){const d=document.createElement('dialog');d.style.cssText='max-width:380px;width:92%;border-radius:12px;background:var(--c);color:var(--t)';
+ d.innerHTML='<b>🔑 เปลี่ยนรหัสผ่านของฉัน</b><label style="margin-top:8px">รหัสผ่านใหม่ (6 ตัวขึ้นไป)</label><input id="pw1" type="password"><label style="margin-top:8px">ยืนยันรหัสผ่านใหม่</label><input id="pw2" type="password"><div id="pwe" class="m" style="color:var(--d);margin-top:6px"></div><div class="row" style="margin-top:10px"><button class="c">ยกเลิก</button><button class="pri o">บันทึก</button></div>';
+ document.body.appendChild(d);d.showModal();d.querySelector('.c').onclick=()=>d.remove();
+ d.querySelector('.o').onclick=async()=>{const a=d.querySelector('#pw1').value,b=d.querySelector('#pw2').value,e=d.querySelector('#pwe');if(a.length<6)return e.textContent='รหัสผ่านอย่างน้อย 6 ตัว';if(a!=b)return e.textContent='รหัสผ่านไม่ตรงกัน';
+  const{error}=await sb.auth.updateUser({password:a});if(error)return e.textContent=error.message;d.remove();toast('เปลี่ยนรหัสผ่านแล้ว')}}
+async function resetPw(id){const p=await dlg('ตั้งรหัสผ่านใหม่ให้ผู้ใช้นี้ (6 ตัวขึ้นไป)',{input:true,ph:'รหัสผ่านใหม่',ok:'เปลี่ยนรหัส'});if(!p)return;if(p.length<6)return toast('รหัสผ่านอย่างน้อย 6 ตัว');
+ const{data,error}=await sb.functions.invoke('create-user',{body:{action:'reset',user_id:id,password:p}});let m=data?.error;if(error&&!m){m=error.message;try{m=(await error.context.json()).error||m}catch(e){}}if(m)return toast('ไม่สำเร็จ: '+m);credDlg(UE[id]||'',p,'✅ เปลี่ยนรหัสผ่านให้แล้ว')}
+function pinCard(){$('set').insertAdjacentHTML('beforeend','<div class="card"><b>🔒 รหัส PIN แอดมิน (4 หลัก)</b><div class="m">ใช้ยืนยันเมื่อเปิดเมนูแอดมินหลังรีเฟรชหน้า/เปิดเครื่องใหม่ (เป็นด่านเสริมบนเครื่องหน้าร้าน ความปลอดภัยหลักยังอยู่ที่การล็อกอิน)</div><div class="row" style="margin-top:6px"><input id="npin" inputmode="numeric" maxlength="4" placeholder="เช่น 1234"><button class="pri" onclick="setPin()">ตั้ง/เปลี่ยน PIN</button></div></div>')}
+async function setPin(){const p=$('npin').value.trim();if(!/^\d{4}$/.test(p))return toast('PIN ต้องเป็นตัวเลข 4 หลัก');const{error}=await sb.rpc('set_admin_pin',{p});toast(error?error.message:'ตั้ง PIN แล้ว');$('npin').value=''}
+const NEWUSER=`<div style="margin-top:12px;border-top:1px solid var(--b);padding-top:10px"><b>➕ เพิ่มผู้ใช้</b><div class="g" style="margin-top:6px"><div><label>ชื่อ</label><input id="un"></div><div><label>อีเมล</label><input id="ue" type="email"></div><div><label>รหัสผ่าน (6 ตัวขึ้นไป)</label><input id="up"></div><div><label>บทบาท</label><select id="ur"><option value="clerk">User (เสมียน)</option><option value="cashier">ผู้จ่ายเงิน/บัญชี</option><option value="admin">Admin</option></select></div></div><button class="pri" style="margin-top:8px" onclick="addUser()">เพิ่มผู้ใช้</button></div>`;
+async function addUser(){const body={name:$('un').value.trim(),email:$('ue').value.trim(),password:$('up').value,role:$('ur').value};if(!body.name||!body.email||body.password.length<6)return toast('กรอกชื่อ อีเมล และรหัสผ่านอย่างน้อย 6 ตัว');
+ const{data,error}=await sb.functions.invoke('create-user',{body});let m=data?.error;if(error&&!m){m=error.message;try{m=(await error.context.json()).error||m}catch(e){}}
+ if(m)return toast('เพิ่มไม่สำเร็จ: '+m);loadUsers();credDlg(body.email,body.password,'✅ เพิ่มผู้ใช้แล้ว')}
+let UL=[],UE={};
+async function fn(body){const{data,error}=await sb.functions.invoke('create-user',{body});let m=data?.error;if(error&&!m){m=error.message;try{m=(await error.context.json()).error||m}catch(e){}}return m||null}
+function credDlg(email,pw,title){const t='อีเมลเข้าสู่ระบบ: '+email+'\nรหัสผ่าน: '+pw;
+ return dlg(title,{body:`<div style="text-align:left;margin:8px 0;padding:10px;background:var(--bg);border-radius:8px;word-break:break-all">อีเมล: <b>${esc(email)}</b><br>รหัสผ่านชั่วคราว: <b>${esc(pw)}</b></div><div class="m">แจ้งพนักงาน แล้วให้เปลี่ยนรหัสเองที่ปุ่ม 🔑</div>`,ok:'📋 คัดลอก',no:'ปิด'}).then(ok=>{if(ok)navigator.clipboard?.writeText(t).then(()=>toast('คัดลอกแล้ว'))})}
+async function loadUsers(){const[{data:ps},{data:es}]=await Promise.all([sb.from('profiles').select('*').order('name'),sb.from('user_emails').select('*')]);
+ UE={};(es||[]).forEach(x=>UE[x.id]=x.email);UL=ps||[];
+ $('ul').innerHTML='<div style="overflow-x:auto"><table><tr><th>ชื่อ</th><th>อีเมล (ใช้ล็อกอิน)</th><th>สิทธิ์</th><th>สถานะ</th><th></th></tr>'+UL.map(u=>{const me=u.id==ME.id,off=u.active===false;
+  return `<tr style="${off?'opacity:.6':''}"><td><input value="${esc(u.name)}" onchange="setName('${u.id}',this.value)"></td><td style="word-break:break-all">${esc(UE[u.id]||'-')}</td>
+  <td><select ${me?'disabled':''} onchange="setRole('${u.id}',this.value)">${Object.entries(RL).map(([k,v])=>`<option value="${k}" ${k==u.role?'selected':''}>${v}</option>`).join('')}</select></td>
+  <td>${off?'<span class="bd void">ปิดใช้งาน</span>':'<span class="bd approved">ใช้งาน</span>'}</td>
+  <td style="white-space:nowrap">${me?'<span class="m">(คุณ)</span>':`<button onclick="resetPw('${u.id}')">รีเซ็ตรหัส</button> <button onclick="toggleUser('${u.id}')">${off?'เปิดใช้งาน':'ปิดใช้งาน'}</button> <button class="ic del" aria-label="ลบผู้ใช้" onclick="delUser('${u.id}')">${TRASH}</button>`}</td></tr>`}).join('')+'</table></div><div class="m" style="margin-top:6px">สิทธิ์: User = ชั่ง/ดูสถานะบิลตัวเอง · ผู้จ่ายเงิน/บัญชี = จ่ายเงิน สต็อก รายงาน · Admin = ทุกเมนู<br>ระบบเก็บรหัสผ่านแบบเข้ารหัส ไม่มีใครดูรหัสเดิมได้ ถ้าพนักงานลืมให้กด "รีเซ็ตรหัส" แล้วแจ้งรหัสใหม่</div>'+NEWUSER}
+async function toggleUser(id){const u=UL.find(x=>x.id==id),en=u.active===false;if(!en&&!await dlg('ปิดใช้งานบัญชี "'+u.name+'"? จะล็อกอินไม่ได้ (ข้อมูลบิลยังอยู่ครบ)',{ok:'ปิดใช้งาน',danger:true}))return;
+ const m=await fn({action:'toggle',user_id:id,active:en});if(m)return toast('ไม่สำเร็จ: '+m);toast(en?'เปิดใช้งานแล้ว':'ปิดใช้งานแล้ว');loadUsers()}
+async function delUser(id){const u=UL.find(x=>x.id==id);if(!await dlg('ลบผู้ใช้ "'+u.name+'" ถาวร? (ลบได้เฉพาะผู้ที่ยังไม่มีประวัติบิล)',{ok:'ลบผู้ใช้',danger:true}))return;
+ const m=await fn({action:'delete',user_id:id});if(m)return toast(m);toast('ลบผู้ใช้แล้ว');loadUsers()}
+async function setRole(id,r){const{error}=await sb.from('profiles').update({role:r}).eq('id',id);toast(error?error.message:'เปลี่ยนบทบาทแล้ว')}
+async function setName(id,n){const{error}=await sb.from('profiles').update({name:n.trim()||'-'}).eq('id',id);toast(error?error.message:'แก้ชื่อแล้ว')}
+function saveSet(){S.shop=$('s1').value;$('shopn').textContent=S.shop;S.unit=$('s5').value;localStorage.setItem('mk_set',JSON.stringify({shop:S.shop,unit:S.unit}));toast('บันทึกแล้ว')}
+async function addTare(){const n=$('tn').value.trim(),w=+$('tw').value;if(!n||!(w>=0))return toast('กรอกให้ครบ');const{error}=await sb.from('tare_presets').insert({name:n,weight_kg:w});if(error)return toast(error.message);await loadAll();rSet()}
+async function delTare(id){await sb.from('tare_presets').delete().eq('id',id);await loadAll();rSet()}
+boot();
+</script></body></html>
