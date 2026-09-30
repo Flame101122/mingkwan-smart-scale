@@ -468,4 +468,14 @@ function saveSet(){S.shop=$('s1').value;$('shopn').textContent=S.shop;S.unit=$('
 async function addTare(){const n=$('tn').value.trim(),w=+$('tw').value;if(!n||!(w>=0))return toast('กรอกให้ครบ');const{error}=await sb.from('tare_presets').insert({name:n,weight_kg:w});if(error)return toast(error.message);await loadAll();rSet()}
 async function delTare(id){await sb.from('tare_presets').delete().eq('id',id);await loadAll();rSet()}
 boot();
-</script></body></html>
+</script> 
+ <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('PWA Service Worker registered'))
+      .catch(err => console.warn('PWA service worker:', err));
+  });
+}
+</script>
+</body></html>
