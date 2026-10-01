@@ -214,7 +214,7 @@ document.addEventListener('focusin',e=>{const t=e.target;if(!(t instanceof HTMLE
  t.dataset.osk='1';t.setAttribute('inputmode','none');oskShow(t)});
 document.addEventListener('focusout',()=>setTimeout(()=>{const a=document.activeElement;if(!oskEl?.contains(a)&&!(a&&a.matches&&a.matches('input,textarea')&&a.dataset.osk))oskHide()},150));
 async function insItems(rows){let{error}=await sb.from('bill_items').insert(rows);if(error&&/weight_src/.test(error.message)){rows=rows.map(({weight_src,...r})=>r);({error}=await sb.from('bill_items').insert(rows))}if(error)throw error}
-let SC={baud:9600,data:8,parity:'none',stop:1,unit:'kg',pick:'first',mode:'auto',auto:true,lock:false,autoConn:true,cmd:'',id:'ชั่ง 1'},scPort=null,scRd=null,scOn=false,scBuf='',scHist=[],scRaw=[],scTmr=null,gsrc='manual';
+let SC={baud:9600,data:8,parity:'none',stop:1,unit:'kg',pick:'first',mode:'auto',auto:true,lock:false,autoConn:true,cmd:'',id:'ชั่ง 1'},scPort=null,scRd=null,scOn=false,scBuf='',scHist=[],scRaw=[],scTmr=null,scBytes=0,scIdle=null,gsrc='manual';
 try{Object.assign(SC,JSON.parse(localStorage.getItem('mk_scale')||'{}'))}catch(e){}
 const scSave=()=>localStorage.setItem('mk_scale',JSON.stringify(SC));
 function parseW(t){if(SC.mode=='reverse')t=[...t].reverse().join('');
@@ -228,12 +228,12 @@ function scFeed(w,st){liveW=w;scHist.push(w);if(scHist.length>6)scHist.shift();
  $('live').textContent=f2(w);$('lw2').textContent=f2(w);$('lw2').style.color=stable?'#16a34a':'';
  if(SC.auto&&stable&&$('wd').open&&($('gross').value===''||gsrc=='scale')&&Math.abs((+$('gross').value)-w)>0.0001){$('gross').value=w;gsrc='scale';calc()}}
 async function scLoop(port){const dec=new TextDecoder('latin1');scRd=port.readable.getReader();
- try{for(;;){const{value,done}=await scRd.read();if(done)break;const t=dec.decode(value,{stream:true});
+ try{for(;;){const{value,done}=await scRd.read();if(done)break;const t=dec.decode(value,{stream:true});scBytes+=value.length;
   scRaw.push({t:new Date().toLocaleTimeString(),x:t.replace(/\r/g,'\\r').replace(/\n/g,'\\n'),h:[...value].map(b=>b.toString(16).padStart(2,'0')).join(' ')});if(scRaw.length>25)scRaw.shift();rawView();
-  scBuf+=t;const ls=scBuf.split(/[\r\n]+/);scBuf=ls.pop();if(scBuf.length>80)scBuf=scBuf.slice(-40);for(const l of ls){const r=parseW(l);if(r)scFeed(r.w,r.st)}}}
+  scBuf+=t;const ls=scBuf.split(/[\r\n]+/);scBuf=ls.pop();if(scBuf.length>80)scBuf=scBuf.slice(-40);for(const l of ls){const r=parseW(l);if(r)scFeed(r.w,r.st)}clearTimeout(scIdle);scIdle=setTimeout(()=>{if(scBuf.trim()){const r=parseW(scBuf);if(r)scFeed(r.w,r.st);scBuf=''}},150)}}
  catch(e){}finally{try{scRd.releaseLock()}catch(e){}scRd=null}
  if(scPort===port){scPort=null;scOn=false;clearInterval(scTmr);try{await port.close()}catch(e){}scStatus()}}
-async function scOpen(port){await port.open({baudRate:+SC.baud,dataBits:+SC.data,parity:SC.parity,stopBits:+SC.stop});scPort=port;scOn=true;scBuf='';scHist=[];scStatus();scLoop(port);clearInterval(scTmr);
+async function scOpen(port){await port.open({baudRate:+SC.baud,dataBits:+SC.data,parity:SC.parity,stopBits:+SC.stop});try{await port.setSignals({dataTerminalReady:true,requestToSend:true})}catch(e){}scPort=port;scBytes=0;scOn=true;scBuf='';scHist=[];scStatus();scLoop(port);clearInterval(scTmr);
  if(SC.cmd){const cmd=SC.cmd.replace(/\\r/g,'\r').replace(/\\n/g,'\n').replace(/\\x([0-9a-f]{2})/gi,(_,h)=>String.fromCharCode(parseInt(h,16))),bytes=Uint8Array.from([...cmd].map(c=>c.charCodeAt(0)));
   scTmr=setInterval(async()=>{try{const w=port.writable.getWriter();await w.write(bytes);w.releaseLock()}catch(e){}},500)}}
 async function scClose(){const p=scPort;scPort=null;scOn=false;clearInterval(scTmr);try{await scRd?.cancel()}catch(e){}await new Promise(r=>setTimeout(r,80));try{await p?.close()}catch(e){}scStatus()}
@@ -250,8 +250,11 @@ async function scDetect(){if(!('serial' in navigator))return toast('ใช้ Ch
   const hits=txt.split(/[\r\n]+/).filter(x=>x.trim()&&/^[\x20-\x7e]+$/.test(x)&&parseW(x)).length;if(hits>=2&&(!best||hits>best.hits))best={b,d,p,s,hits}}
  if(!best)return toast('ไม่พบข้อมูลจากตาชั่ง: ตรวจสาย/ให้ตาชั่งอยู่โหมดส่งข้อมูล (บางรุ่นต้องกด Print) หรือใส่ "คำสั่งขอค่า" ในตั้งค่า');
  Object.assign(SC,{baud:best.b,data:best.d,parity:best.p,stop:best.s});scSave();try{await scOpen(port);toast('พบแล้ว: '+best.b+' baud เชื่อมต่อเรียบร้อย')}catch(e){toast(e.message)}}
+async function scLoopTest(){if(!scOn||!scPort?.writable)return toast('ต่อพอร์ตก่อน (ถอดสายตาชั่งออก แล้วลัดวงจรพิน 2 กับ 3 ของปลายสาย/พอร์ตคอม) จึงทดสอบได้',6000);const b0=scBytes;
+ try{const w=scPort.writable.getWriter();await w.write(new TextEncoder().encode('TEST123\r\n'));w.releaseLock()}catch(e){return toast('ส่งไม่ได้: '+e.message)}
+ await new Promise(r=>setTimeout(r,900));const ok=scBytes>b0;scFeed(0,null);toast(ok?'✅ พอร์ตและโปรแกรมทำงานปกติ (ได้ข้อมูลวนกลับมา) — ปัญหาอยู่ที่สาย/ตาชั่ง/การตั้งค่าตาชั่ง':'❌ ไม่ได้ข้อมูลวนกลับ ตรวจว่าลัดวงจรพิน 2 กับ 3 แล้ว และเลือกพอร์ตถูก',9000)}
 function useLive(){if(!scOn)return toast('ยังไม่ได้เชื่อมต่อตาชั่ง');$('gross').value=liveW;gsrc='scale';calc()}
-function rawView(){const el=window._rawEl;if(el){el.textContent=scRaw.map(r=>r.t+'  '+r.x+'\n           HEX '+r.h).join('\n')||'(ยังไม่มีข้อมูล — ต่อตาชั่งแล้ววางของบนตาชั่ง)';el.scrollTop=el.scrollHeight}}
+function rawView(){const el=window._rawEl;if(el){el.textContent='รับแล้ว '+scBytes+' ไบต์ · '+(scOn?'เชื่อมต่ออยู่':'ยังไม่ได้เชื่อมต่อ')+'\n'+(scRaw.map(r=>r.t+'  '+r.x+'\n           HEX '+r.h).join('\n')||'(ยังไม่มีข้อมูล — ต่อตาชั่งแล้ววางของบนตาชั่ง)');el.scrollTop=el.scrollHeight}}
 function scaleDlg(){const d=document.createElement('dialog');d.style.cssText='max-width:620px;width:96%;border-radius:14px;background:var(--c);color:var(--t)';
  const sel=(id,arr,v)=>`<select id="${id}">${arr.map(x=>`<option${x==v?' selected':''}>${x}</option>`).join('')}</select>`;
  d.innerHTML=`<b style="font-size:20px">⚙ ตั้งค่าตาชั่ง</b><div class="m" style="margin:4px 0 8px">รองรับตาชั่งที่ต่อผ่านสาย RS-232 (พอร์ต DB9/แจ็ค), สาย USB-to-Serial, RS-485 ผ่านตัวแปลง USB หรืออุปกรณ์ USB ที่ขึ้นเป็นพอร์ต COM · ใช้ Chrome/Edge</div>
@@ -262,9 +265,9 @@ function scaleDlg(){const d=document.createElement('dialog');d.style.cssText='ma
  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="c10" style="width:auto"${SC.autoConn?' checked':''}> เชื่อมต่อตาชั่งอัตโนมัติเมื่อเปิดโปรแกรม</label>
  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="c11" style="width:auto"${SC.lock?' checked':''}${adm?'':' disabled'}> 🔒 ล็อกน้ำหนัก: ห้ามพิมพ์เอง ใช้ค่าจากตาชั่งเท่านั้น (แอดมินเท่านั้น)</label>
  <div class="m" style="margin-top:8px">ข้อมูลดิบที่ตาชั่งส่งมา (ใช้ตรวจสอบ/ส่งให้ผู้พัฒนาปรับ):</div><pre id="rawv" style="background:#111;color:#7CFC98;padding:8px;border-radius:8px;height:130px;overflow:auto;font-size:12px;white-space:pre-wrap;margin:4px 0"></pre>
- <div class="row"><button class="dn">ปิด</button><button class="det">🔍 ตรวจหาค่าอัตโนมัติ</button><button class="sv pri">💾 บันทึก</button></div>`;
- document.body.appendChild(d);d.showModal();window._rawEl=d.querySelector('#rawv');rawView();
- const close=()=>{window._rawEl=null;d.remove()};d.querySelector('.dn').onclick=close;d.oncancel=close;d.querySelector('.det').onclick=()=>{close();scDetect()};
+ <div class="row"><button class="dn">ปิด</button><button class="lt">🧪 ทดสอบวนกลับ</button><button class="det">🔍 ตรวจหาค่าอัตโนมัติ</button><button class="sv pri">💾 บันทึก</button></div>`;
+ document.body.appendChild(d);d.showModal();window._rawEl=d.querySelector('#rawv');rawView();const riv=setInterval(rawView,500);
+ const close=()=>{clearInterval(riv);window._rawEl=null;d.remove()};d.querySelector('.dn').onclick=close;d.oncancel=close;d.querySelector('.det').onclick=()=>{close();scDetect()};d.querySelector('.lt').onclick=scLoopTest;
  d.querySelector('.sv').onclick=async()=>{const g=i=>d.querySelector('#'+i);Object.assign(SC,{baud:+g('c1').value,data:+g('c2').value,parity:g('c3').value,stop:+g('c4').value,unit:g('c5').value,pick:g('c6').value,mode:g('c7').value,cmd:g('c8').value,id:g('c12').value.trim()||'ชั่ง 1',auto:g('c9').checked,autoConn:g('c10').checked});
   if(adm)SC.lock=g('c11').checked;scSave();close();if(scOn){await scClose();await scAuto(true)}scStatus();toast('บันทึกการตั้งค่าตาชั่งแล้ว')}}
 // ---------- POS ----------
