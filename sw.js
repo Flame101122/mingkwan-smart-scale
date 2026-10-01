@@ -1,5 +1,22 @@
-const CACHE='mingkwan-smart-scale-shell-v2';
-const APP_SHELL=['./','./index.html','./manifest.json','./icons/icon-192.png','./icons/icon-512.png'];
-self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(APP_SHELL)).then(()=>self.skipWaiting()));});
-self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
-self.addEventListener('fetch',event=>{if(event.request.method!=='GET')return;const url=new URL(event.request.url);if(url.hostname.endsWith('supabase.co'))return;if(url.origin!==self.location.origin)return;event.respondWith(fetch(event.request).then(response=>{const copy=response.clone();caches.open(CACHE).then(c=>c.put(event.request,copy)).catch(()=>{});return response;}).catch(()=>caches.match(event.request).then(c=>c||caches.match('./index.html'))));});
+// Mingkwan Smart Scale - service worker
+// หน้าเว็บ: ลองโหลดจากเน็ตก่อน (ได้เวอร์ชันล่าสุดเสมอ) ถ้าออฟไลน์ค่อยใช้ที่แคช
+// ไม่ยุ่งกับคำขอข้ามโดเมน (Supabase, CDN, ฟอนต์) และไม่แคช POST/websocket -> ข้อมูลบิลสดใหม่เสมอ
+const V = 'mk-v1';
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(V).then(c => c.addAll(['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png']).catch(() => {})).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+});
+self.addEventListener('fetch', e => {
+  const r = e.request;
+  if (r.method !== 'GET') return;
+  const u = new URL(r.url);
+  if (u.origin !== location.origin) return;            // Supabase / CDN / fonts: ปล่อยผ่านตามปกติ
+  e.respondWith(
+    fetch(r, { cache: 'no-store' }).then(res => {
+      if (res.ok) { const cp = res.clone(); caches.open(V).then(c => c.put(r, cp)); }
+      return res;
+    }).catch(() => caches.match(r).then(m => m || caches.match('./index.html')))
+  );
+});
