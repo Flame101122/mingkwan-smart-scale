@@ -48,7 +48,16 @@ button{white-space:nowrap;line-height:1.4;min-height:40px}.ic{min-height:36px}
 .tile{background:#fff;color:#1d2733;border:0;border-radius:16px;padding:26px 16px;text-align:center;width:100%;white-space:normal}
 .tile .ci{width:88px;height:88px;border-radius:50%;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;color:#fff}.tile b{font-size:26px;display:block}.tile span{color:#6b7785;font-size:14px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:10px}.stat{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:12px}.stat b{font-size:26px;display:block}
-.bar{display:grid;grid-template-columns:130px 1fr 110px;gap:8px;align-items:center;padding:4px 0}.bar div{background:var(--bg);border-radius:6px;height:12px}.bar i{display:block;height:100%;background:var(--bl);border-radius:6px}.bar b{text-align:right}.sbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.dot{width:12px;height:12px;border-radius:50%;background:#9ca3af;flex:none}.bt-blue{background:var(--bl);color:#fff;border-color:var(--bl)}.bt-or{background:#f59e0b;color:#fff;border-color:#f59e0b}
+.bar{display:grid;grid-template-columns:130px 1fr 110px;gap:8px;align-items:center;padding:4px 0}.bar div{background:var(--bg);border-radius:6px;height:12px}.bar i{display:block;height:100%;background:var(--bl);border-radius:6px}.bar b{text-align:right}.sbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.dot{width:12px;height:12px;border-radius:50%;background:#9ca3af;flex:none}
+nav button{border-left:4px solid var(--c1,#64748b)}
+nav button[data-t=weigh]{--c1:#22c55e}nav button[data-t=truck]{--c1:#0ea5e9}nav button[data-t=dash]{--c1:#818cf8}nav button[data-t=mine]{--c1:#2dd4bf}nav button[data-t=admin]{--c1:#f59e0b}nav button[data-t=hist]{--c1:#a78bfa}nav button[data-t=audit]{--c1:#f472b6}nav button[data-t=stock]{--c1:#fb923c}nav button[data-t=rep]{--c1:#60a5fa}nav button[data-t=prod]{--c1:#a3e635}nav button[data-t=set]{--c1:#94a3b8}
+nav button.on{background:var(--c1,var(--bl));color:#0b1220}main{border-top:4px solid var(--ac,#22c55e)}
+.dsk-b{background:#2563eb!important;color:#fff}.dsk-r{background:#dc2626!important;color:#fff}#lo{background:#dc2626;color:#fff;border:0}#lo2{background:#2563eb;color:#fff;border:0}#mb{background:#ffffff26;color:#fff;border:0}
+button[onclick*="showBill"]{background:#2563eb;color:#fff;border-color:#2563eb}button[onclick*="arch("]{background:#f59e0b;color:#fff;border-color:#f59e0b}button[onclick*="resetPw"]{background:#f59e0b;color:#fff;border-color:#f59e0b}button[onclick*="toggleUser"]{background:#7c3aed;color:#fff;border-color:#7c3aed}button[onclick*="scaleDlg"]{background:#4f46e5;color:#fff;border-color:#4f46e5}
+.inbox{border-left:6px solid #f59e0b}
+#osk{position:fixed;left:0;right:0;bottom:0;background:#dfe3ea;padding:6px;z-index:60;box-shadow:0 -3px 14px #0005;display:none;user-select:none}#osk.show{display:block}
+#osk .kr{display:flex;gap:5px;margin-bottom:5px;justify-content:center}#osk button{flex:1;max-width:70px;min-width:0;min-height:48px;padding:0;font-size:19px;background:#fff;color:#111;border:1px solid #b6bfcc;border-radius:8px}
+#osk button.kw{max-width:none;flex:2}#osk button.ks{background:#c7d2fe}#osk button.kd{background:#dc2626;color:#fff;border-color:#dc2626}#osk button.ke{background:#16a34a;color:#fff;border-color:#16a34a}.bt-blue{background:var(--bl);color:#fff;border-color:var(--bl)}.bt-or{background:#f59e0b;color:#fff;border-color:#f59e0b}
 .bill{background:#fffdf7;color:#222;border:1px solid #e7dfc8;border-radius:14px;box-shadow:0 2px 10px #0002}.bill input{background:#fff;color:#222;border-color:#ddd}.bill .m{color:#6b6450}
 .bh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px dashed #cfc6ad;padding-bottom:8px;margin-bottom:8px}.bno{background:#e8f0ff;color:#1e40af;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700}
 .bill .ln{border-bottom:1px dashed #cfc6ad}.bsum{border-top:2px dashed #cfc6ad;margin-top:8px;padding-top:6px}.addp{width:100%;border:2px dashed var(--bl);color:var(--bl);background:transparent;font-weight:700}
@@ -70,7 +79,7 @@ nav.open{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
 
 <header><div class="brand"><div><div class="khw"><i>KH</i>W</div><small id="shopn">Mingkwan Smart Scale</small></div><button id="mb" onclick="$('nav').classList.toggle('open')" aria-label="เมนู">☰ เมนู</button><button id="lo2" onclick="chPw()" aria-label="เปลี่ยนรหัสผ่าน">🔑</button><button id="lo" onclick="logout()">ออก</button></div><div id="who"></div>
 <nav id="nav"><div class="ng" data-g="front">หน้าร้าน</div><button data-t="weigh" class="on">⚖ ชั่ง/รับซื้อ</button><button data-t="truck">🚚 ชั่งรถ (กิโลใหญ่)</button><button data-t="dash">🏠 แดชบอร์ด</button><button data-t="mine">📋 สถานะบิล</button><div class="ng" data-g="back">หลังบ้าน</div><button data-t="admin">💰 จ่ายเงิน/อนุมัติ <span id="bg"></span></button><button data-t="hist">🧾 ประวัติ/ยกเลิก</button><button data-t="audit">🔍 ตรวจสอบรูป</button><button data-t="stock">📦 สต็อก</button><button data-t="rep">📊 รายงาน</button><button data-t="prod">🏷 สินค้า/ราคา</button><button data-t="set">⚙ ผู้ใช้/ตั้งค่า</button></nav>
-<button class="dsk" onclick="chPw()">🔑 เปลี่ยนรหัสผ่าน</button><button class="dsk" onclick="logout()">ออกจากระบบ</button></header>
+<button class="dsk dsk-b" onclick="chPw()">🔑 เปลี่ยนรหัสผ่าน</button><button class="dsk dsk-r" onclick="logout()">ออกจากระบบ</button></header>
 <div id="login" style="position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;overflow:auto;padding:16px"><div style="width:min(760px,100%)">
  <div style="text-align:center"><div class="khw" style="font-size:56px"><i>KH</i>W</div><div style="opacity:.85;margin-top:4px">Mingkwan Smart Scale · ระบบรับซื้อ</div></div>
  <div id="lpre" style="text-align:center;margin-top:10px;color:#ffffffb0"></div>
@@ -83,7 +92,7 @@ nav.open{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
 <section id="weigh" class="on">
 <div class="pos"><div>
  <div class="card sbar"><span id="sdot" class="dot"></span><div style="flex:1;min-width:150px"><b id="scst">ตาชั่ง: ยังไม่เชื่อมต่อ</b><div class="m" id="scm">พิมพ์น้ำหนักเองได้</div></div><b id="lw2" style="font-size:24px">0.00</b><span class="m">กก.</span><button onclick="scaleDlg()">⚙ ตั้งค่า</button><button class="pri" id="scbtn" onclick="scToggle()">🔌 ต่อตาชั่ง</button></div>
- <div class="card row" style="align-items:center"><input id="psq" placeholder="🔍 ค้นหาสินค้า พิมพ์ชื่อหรือรหัส (Enter = เลือกตัวแรก)" oninput="renderPos()" onkeydown="if(event.key=='Enter')psEnter()" style="flex:3;min-width:180px"><button class="bt-blue" onclick="scanProd()">📷 ให้กล้องช่วยดู</button></div>
+ <div class="card row" style="align-items:center"><input id="psq" placeholder="🔍 ค้นหาสินค้า พิมพ์ชื่อหรือรหัส (Enter = เลือกตัวแรก)" oninput="renderPos()" onkeydown="if(event.key=='Enter')psEnter()" style="flex:3;min-width:180px"><button onclick="oskFor($('psq'))" aria-label="แป้นพิมพ์" style="flex:0 0 auto">⌨</button><button class="bt-blue" onclick="scanProd()">📷 ให้กล้องช่วยดู</button></div>
  <div class="card cg"><div id="cats"></div><div id="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px"></div></div></div>
  <div class="card posR bill">
   <div class="bh"><div><b style="font-size:18px">🧾 ใบรับซื้อ</b><div class="m" id="bmeta"></div></div><span class="bno">บิลใหม่</span></div>
@@ -112,14 +121,14 @@ nav.open{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const f2=n=>(+n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
 const r2=n=>Math.round((n+Number.EPSILON)*100)/100,uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-function toast(m){const t=$('toast');t.textContent=m;try{t.hidePopover()}catch(e){}try{t.showPopover()}catch(e){}clearTimeout(toast.h);toast.h=setTimeout(()=>{try{t.hidePopover()}catch(e){}},3000)}
+function toast(m,ms){const t=$('toast');t.textContent=m;try{t.hidePopover()}catch(e){}try{t.showPopover()}catch(e){}clearTimeout(toast.h);toast.h=setTimeout(()=>{try{t.hidePopover()}catch(e){}},ms||3000)}
 addEventListener('unhandledrejection',e=>{toast('ผิดพลาด: '+(e.reason?.message||e.reason));e.preventDefault()});addEventListener('error',e=>toast('ผิดพลาด: '+e.message));
 function dlg(title,{input=false,ok='ตกลง',danger=false,no='ยกเลิก',body='',ph='ระบุเหตุผล'}={}){return new Promise(r=>{const d=document.createElement('dialog');d.style.cssText='max-width:420px;width:92%;border-radius:12px;background:var(--c);color:var(--t)';
  d.innerHTML=`<b>${esc(title)}</b>${body}${input?'<textarea id="di" rows="3" style="margin-top:8px" placeholder="${esc(ph)}"></textarea>':''}<div class="row" style="margin-top:10px"><button id="dn">${no}</button><button id="dk" class="${danger?'dan':'pri'}">${ok}</button></div>`;
  document.body.appendChild(d);d.showModal();const done=v=>{d.remove();r(v)};d.oncancel=()=>done(null);d.querySelector('#dn').onclick=()=>done(null);
  d.querySelector('#dk').onclick=()=>{const v=input?d.querySelector('#di').value.trim():true;if(input&&!v)return d.querySelector('#di').focus();done(v)}})}
 const sb=supabase.createClient('https://sunifccylaokivalwjic.supabase.co','sb_publishable_mNYJioB49fgTQZZzQq3zgg_QpA0fu2n');
-let ME=null,T=[],saving=false;const TABS={clerk:['weigh','truck','dash','mine'],cashier:['dash','admin','hist','stock','rep'],admin:['weigh','truck','dash','admin','hist','audit','stock','rep','prod','set']},RL={clerk:'User (เสมียน)',cashier:'ผู้จ่ายเงิน/บัญชี',admin:'Admin'},can=t=>TABS[ME?.role]?.includes(t),FRONT=['weigh','truck','dash','mine'];
+let ME=null,T=[],saving=false;const TABS={clerk:['weigh','truck','dash','mine'],cashier:['dash','admin','hist','stock','rep'],admin:['weigh','truck','dash','admin','hist','audit','stock','rep','prod','set']},RL={clerk:'User (เสมียน)',cashier:'ผู้จ่ายเงิน/บัญชี',admin:'Admin'},can=t=>TABS[ME?.role]?.includes(t),FRONT=['weigh','truck','dash','mine'],TC={weigh:'#22c55e',truck:'#0ea5e9',dash:'#818cf8',mine:'#2dd4bf',admin:'#f59e0b',hist:'#a78bfa',audit:'#f472b6',stock:'#fb923c',rep:'#60a5fa',prod:'#a3e635',set:'#94a3b8'};
 let S={shop:'Mingkwan Smart Scale',recorder:'พนักงาน 1',pin:'1234',tares:'ตะกร้าเล็ก:1.2,ตะกร้าใหญ่:2.5,กระสอบ:0.3',unit:'kg'};
 let P=[],B=[],cur={lines:[],photos:[]},adm=false,cash=false,stream=null,liveW=0,lastPend=-1;
 // ---------- auth / init ----------
@@ -147,23 +156,23 @@ async function boot(){try{Object.assign(S,JSON.parse(localStorage.getItem('mk_se
  if(!want){PRE=me;return showLogin()}
  ME=me;S.recorder=me.name;adm=me.role=='admin';cash=me.role!='clerk';$('login').style.display='none';$('who').innerHTML=esc(me.name)+'<br>'+RL[me.role];$('shopn').textContent=S.shop;
  document.querySelectorAll('nav button').forEach(b=>{if(!can(b.dataset.t))b.style.display='none'});document.querySelectorAll('.ng').forEach(g=>{g.style.display=TABS[ME.role].some(t=>(g.dataset.g=='front')==FRONT.includes(t))?'':'none'});
- await loadAll();scStatus();scAuto();
- sb.channel('bills-live').on('postgres_changes',{event:'*',schema:'public',table:'bills'},async()=>{await loadB();if(cash&&$('admin').classList.contains('on'))rAdmin(true);if($('mine').classList.contains('on'))rMine();if($('dash').classList.contains('on'))rDash()}).subscribe();document.querySelector('nav button[data-t="'+TABS[ME.role][0]+'"]').click()}
+ await loadAll();scStatus();scAuto();if(cash&&window.Notification&&Notification.permission=='default')Notification.requestPermission();
+ sb.channel('bills-live').on('postgres_changes',{event:'*',schema:'public',table:'bills'},async pl=>{if(pl.eventType=='INSERT')await new Promise(r=>setTimeout(r,1500));await loadB();if(pl.eventType=='INSERT'&&cash)notifyBill(pl.new);if(cash&&$('admin').classList.contains('on'))rAdmin(true);if($('mine').classList.contains('on'))rMine();if($('dash').classList.contains('on'))rDash()}).subscribe();document.querySelector('nav button[data-t="'+TABS[ME.role][0]+'"]').click()}
 async function loadAll(){const[p,t]=await Promise.all([sb.from('products').select('*').eq('active',true).order('sort_order').order('code'),sb.from('tare_presets').select('*').order('name')]);
- P=(p.data||[]).map(x=>({id:x.id,code:x.code,name:x.name,price:+x.price_per_kg,cat:x.category||'อื่นๆ',color:x.color}));T=(t.data||[]).map(x=>({id:x.id,n:x.name,w:+x.weight_kg}));fillSel();await loadB()}
+ P=(p.data||[]).map(x=>({id:x.id,code:x.code,name:x.name,price:+x.price_per_kg,cat:x.category||'อื่นๆ',color:x.color}));T=(t.data||[]).map(x=>({id:x.id,n:x.name,w:+x.weight_kg}));fillSel();NAMES=Object.fromEntries(((await sb.from('profiles').select('id,name')).data||[]).map(x=>[x.id,x.name]));await loadB()}
 const BSEL='*,bill_items(*),rec:profiles!bills_recorder_id_fkey(name),pay:profiles!bills_approved_by_fkey(name),vby:profiles!bills_voided_by_fkey(name)';
-function mapBill(b){return{id:b.id,no:b.bill_no,ts:Date.parse(b.created_at),seller:b.seller_name,recorder:b.rec?.name||'',total:+b.total,status:b.status,audit:b.audit,anote:b.audit_note,apts:b.approved_at?Date.parse(b.approved_at):0,payer:b.pay?.name||'',vr:b.void_reason,vts:b.voided_at?Date.parse(b.voided_at):0,vby:b.vby?.name||'',arch:b.archived,lines:b.bill_items.map(i=>({name:i.product_name,price:+i.price_per_kg,gross:+i.gross_kg,tare:+i.tare_kg,pct:+i.impurity_pct,net:+i.net_kg,amount:+i.amount,src:i.weight_src}))}}
+function mapBill(b){return{id:b.id,no:b.bill_no,ts:Date.parse(b.created_at),seller:b.seller_name,recorder:b.rec?.name||'',total:+b.total,status:b.status,audit:b.audit,anote:b.audit_note,apts:b.approved_at?Date.parse(b.approved_at):0,payer:b.pay?.name||'',vr:b.void_reason,vts:b.voided_at?Date.parse(b.voided_at):0,vby:b.vby?.name||'',arch:b.archived,scale:b.scale_no,lines:b.bill_items.map(i=>({name:i.product_name,price:+i.price_per_kg,gross:+i.gross_kg,tare:+i.tare_kg,pct:+i.impurity_pct,net:+i.net_kg,amount:+i.amount,src:i.weight_src}))}}
 let HB=[];
 async function loadB(){const{data,error}=await sb.from('bills').select(BSEL).order('created_at',{ascending:false}).limit(300);
  if(error)return toast('โหลดบิลไม่ได้: '+error.message);
  B=data.map(mapBill);
- const n=B.filter(b=>b.status=='pending').length;$('bg').textContent=cash&&n?'('+n+')':'';if(cash&&lastPend>=0&&n>lastPend)toast('🔔 มีบิลใหม่รออนุมัติ');lastPend=n}
+ const n=B.filter(b=>b.status=='pending').length;$('bg').textContent=cash&&n?'('+n+')':'';lastPend=n}
 function tares(){return T}
 function fillSel(){renderPos();$('pid').innerHTML=P.map(p=>`<option value="${p.id}">${esc(p.code)} · ${esc(p.name)} (฿${p.price}/กก.)</option>`).join('');
  $('tareSel').innerHTML='<option value="0">ไม่หัก</option>'+tares().map(t=>`<option value="${t.w}">${esc(t.n)} (${t.w} กก.)</option>`).join('')}
 // ---------- tabs ----------
 $('nav').onclick=async e=>{const t=e.target.closest('button')?.dataset.t;if(!t)return;
- if(!can(t))return;$('nav').classList.remove('open');
+ if(!can(t))return;$('nav').classList.remove('open');document.documentElement.style.setProperty('--ac',TC[t]||'#22c55e');
  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));
  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==t));
  ({admin:rAdmin,audit:rAudit,stock:rStock,dash:rDash,mine:rMine,truck:rTruck,hist:rHist,prod:rProd,rep:rRep,set:rSet}[t]||(()=>{}))()};
@@ -176,15 +185,43 @@ let wph=[];
 function rPh(){$('phs').innerHTML=wph.map((p,i)=>`<div class="pth"><img src="${p}"><button aria-label="ลบรูป" onclick="delPh(${i})">✕</button></div>`).join('')}
 function delPh(i){wph.splice(i,1);rPh()}
 // ---------- scale (Web Serial) ----------
+let NAMES={};
+async function insBill(row){let r=await sb.from('bills').insert(row).select().single();if(r.error&&/scale_no/.test(r.error.message)){delete row.scale_no;r=await sb.from('bills').insert(row).select().single()}if(r.error)throw r.error;return r.data}
+function beep(){try{const a=beep.a||(beep.a=new(window.AudioContext||window.webkitAudioContext)()),tone=(f,at)=>setTimeout(()=>{const o=a.createOscillator(),g=a.createGain();o.frequency.value=f;g.gain.value=.15;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.25)},at);tone(880,0);tone(1175,280)}catch(e){}}
+function notifyBill(r){const who=NAMES[r.recorder_id]||'พนักงาน',msg=`บิลใหม่ ${r.bill_no} · ${r.scale_no||'-'} · ${who} · ${r.seller_name} · ฿${f2(r.total)}`;beep();toast('🔔 '+msg,8000);document.title='🔔 บิลใหม่! Mingkwan';setTimeout(()=>document.title='Mingkwan Smart Scale',5000);
+ try{if(window.Notification&&Notification.permission=='granted')new Notification('บิลใหม่รอจ่ายเงิน',{body:msg})}catch(e){}}
+// ---------- on-screen keyboard (touch-screen desktops; phones keep the system keyboard) ----------
+const KB={th:['_ๅ/-ภถุึคตจขช','ๆไำพะัีรนยบลฃ','ฟหกดเ้่าสวง','ผปแอิืทมใฝ'],TH:['%+๑๒๓๔ู฿๕๖๗๘๙','๐"ฎฑธํ๊ณฯญฐ,','ฤฆฏโฌ็๋ษศซ.','()ฉฮฺ์?ฒฬฦ'],en:['1234567890-','qwertyuiop','asdfghjkl','zxcvbnm,.'],EN:['!@#$%^&*()_','QWERTYUIOP','ASDFGHJKL','ZXCVBNM<>?']};
+let oskEl=null,oskT=null,oskLang='th',oskShift=false,oskForce=false;
+const isPhone=()=>innerWidth<900||/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||!!navigator.userAgentData?.mobile;
+const oskMode=()=>localStorage.getItem('mk_osk')||'auto';
+const oskWant=()=>{const m=oskMode();return m=='on'||(m=='auto'&&!isPhone()&&(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches))};
+const kComb=c=>/[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/.test(c);
+function oskDraw(){const k=KB[oskLang=='th'?(oskShift?'TH':'th'):(oskShift?'EN':'en')];
+ oskEl.innerHTML=k.map(r=>`<div class="kr">${[...r].map(c=>`<button data-c="${esc(c)}">${kComb(c)?'◌'+c:esc(c)}</button>`).join('')}</div>`).join('')+
+ `<div class="kr"><button class="ks kw" data-a="shift">⇧</button><button class="ks kw" data-a="lang">${oskLang=='th'?'ไทย → EN':'EN → ไทย'}</button><button class="kw" style="flex:5" data-c=" ">เว้นวรรค</button><button class="kd kw" data-a="bs">⌫</button><button class="ke kw" data-a="enter">ตกลง ↵</button><button class="kw" data-a="close">▼</button></div>`}
+function oskType(ch){const t=oskT;if(!t)return;if(t.selectionStart==null)t.value+=ch;else t.setRangeText(ch,t.selectionStart,t.selectionEnd,'end');t.dispatchEvent(new Event('input',{bubbles:true}));if(oskShift){oskShift=false;oskDraw()}}
+function oskBack(){const t=oskT;if(!t)return;if(t.selectionStart==null)t.value=t.value.slice(0,-1);else{let a=t.selectionStart,b=t.selectionEnd;if(a==b)a=Math.max(0,a-1);t.setRangeText('',a,b,'end')}t.dispatchEvent(new Event('input',{bubbles:true}))}
+function oskShow(t){if(!oskEl){oskEl=document.createElement('div');oskEl.id='osk';oskEl.addEventListener('mousedown',e=>e.preventDefault());
+  oskEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const a=b.dataset.a;
+   if(a=='shift'){oskShift=!oskShift;oskDraw()}else if(a=='lang'){oskLang=oskLang=='th'?'en':'th';oskShift=false;oskDraw()}else if(a=='bs')oskBack();
+   else if(a=='enter'){oskT?.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));oskHide()}else if(a=='close')oskHide();else if(b.dataset.c!=null)oskType(b.dataset.c)})}
+ oskT=t;const host=t.closest('dialog[open]')||document.body;if(oskEl.parentNode!==host)host.appendChild(oskEl);oskDraw();oskEl.classList.add('show');document.body.style.paddingBottom=oskEl.offsetHeight+'px';setTimeout(()=>t.scrollIntoView({block:'center'}),60)}
+function oskHide(){if(oskEl){oskEl.classList.remove('show');if(oskEl.parentNode!==document.body)document.body.appendChild(oskEl)}document.body.style.paddingBottom='';oskT=null;oskForce=false}
+function oskFor(t){oskForce=true;t.dataset.osk='1';t.setAttribute('inputmode','none');t.focus();oskShow(t)}
+document.addEventListener('focusin',e=>{const t=e.target;if(!(t instanceof HTMLElement)||!t.matches('input,textarea'))return;const ty=(t.getAttribute('type')||'text').toLowerCase();
+ if(['number','date','checkbox','radio','file','range','color','button'].includes(ty))return;if(!t.dataset.osk&&t.getAttribute('inputmode')==='none')return;if(!oskForce&&!oskWant())return;
+ t.dataset.osk='1';t.setAttribute('inputmode','none');oskShow(t)});
+document.addEventListener('focusout',()=>setTimeout(()=>{const a=document.activeElement;if(!oskEl?.contains(a)&&!(a&&a.matches&&a.matches('input,textarea')&&a.dataset.osk))oskHide()},150));
 async function insItems(rows){let{error}=await sb.from('bill_items').insert(rows);if(error&&/weight_src/.test(error.message)){rows=rows.map(({weight_src,...r})=>r);({error}=await sb.from('bill_items').insert(rows))}if(error)throw error}
-let SC={baud:9600,data:8,parity:'none',stop:1,unit:'kg',pick:'first',mode:'auto',auto:true,lock:false,autoConn:true,cmd:''},scPort=null,scRd=null,scOn=false,scBuf='',scHist=[],scRaw=[],scTmr=null,gsrc='manual';
+let SC={baud:9600,data:8,parity:'none',stop:1,unit:'kg',pick:'first',mode:'auto',auto:true,lock:false,autoConn:true,cmd:'',id:'ชั่ง 1'},scPort=null,scRd=null,scOn=false,scBuf='',scHist=[],scRaw=[],scTmr=null,gsrc='manual';
 try{Object.assign(SC,JSON.parse(localStorage.getItem('mk_scale')||'{}'))}catch(e){}
 const scSave=()=>localStorage.setItem('mk_scale',JSON.stringify(SC));
 function parseW(t){if(SC.mode=='reverse')t=[...t].reverse().join('');
  const ms=[...t.matchAll(/([-+]?\d+(?:\.\d+)?)\s*(kg|g|lb|oz)?/gi)];if(!ms.length)return null;const m=SC.pick=='last'?ms[ms.length-1]:ms[0];let w=parseFloat(m[1]);if(!isFinite(w))return null;
  const u=(m[2]||'').toLowerCase();if(u=='g'||(!u&&SC.unit=='g'))w/=1000;else if(u=='lb')w*=.45359237;else if(u=='oz')w*=.0283495;
  return{w:Math.max(0,w),st:/(^|[^A-Za-z])ST/.test(t)?true:/(^|[^A-Za-z])US/.test(t)?false:null}}
-function scStatus(){if(!$('sdot'))return;$('sdot').style.background=scOn?'#22c55e':'#9ca3af';$('scst').textContent=scOn?'ตาชั่ง: เชื่อมต่อแล้ว':'ตาชั่ง: ยังไม่เชื่อมต่อ';
+function scStatus(){if(!$('sdot'))return;$('sdot').style.background=scOn?'#22c55e':'#9ca3af';$('scst').textContent=SC.id+(scOn?': เชื่อมต่อแล้ว':': ยังไม่เชื่อมต่อ');
  $('scm').textContent=scOn?(SC.lock?'🔒 ล็อกน้ำหนัก: ใช้ค่าจากตาชั่งเท่านั้น':SC.auto?'ดึงน้ำหนักอัตโนมัติเมื่อนิ่ง':'กด "ใช้ค่าจากตาชั่ง" ในหน้าต่างชั่ง'):(SC.lock?'🔒 ล็อกน้ำหนักเปิดอยู่: ต้องต่อตาชั่งก่อน':'พิมพ์น้ำหนักเองได้');$('scbtn').textContent=scOn?'ตัดการเชื่อมต่อ':'🔌 ต่อตาชั่ง'}
 function scFeed(w,st){liveW=w;scHist.push(w);if(scHist.length>6)scHist.shift();
  const stable=w>0&&(st===true||(st===null&&scHist.length>=5&&Math.max(...scHist)-Math.min(...scHist)<=0.01));
@@ -220,7 +257,7 @@ function scaleDlg(){const d=document.createElement('dialog');d.style.cssText='ma
  d.innerHTML=`<b style="font-size:20px">⚙ ตั้งค่าตาชั่ง</b><div class="m" style="margin:4px 0 8px">รองรับตาชั่งที่ต่อผ่านสาย RS-232 (พอร์ต DB9/แจ็ค), สาย USB-to-Serial, RS-485 ผ่านตัวแปลง USB หรืออุปกรณ์ USB ที่ขึ้นเป็นพอร์ต COM · ใช้ Chrome/Edge</div>
  <div class="g"><div><label>Baud rate</label>${sel('c1',[1200,2400,4800,9600,19200,38400,57600,115200],SC.baud)}</div><div><label>Data bits</label>${sel('c2',[8,7],SC.data)}</div><div><label>Parity</label>${sel('c3',['none','even','odd'],SC.parity)}</div><div><label>Stop bits</label>${sel('c4',[1,2],SC.stop)}</div>
  <div><label>หน่วยที่ตาชั่งส่งมา</label>${sel('c5',['kg','g'],SC.unit)}</div><div><label>เลือกตัวเลขในบรรทัด</label><select id="c6"><option value="first"${SC.pick=='first'?' selected':''}>ตัวแรก</option><option value="last"${SC.pick=='last'?' selected':''}>ตัวสุดท้าย</option></select></div>
- <div><label>รูปแบบตัวเลข</label><select id="c7"><option value="auto"${SC.mode=='auto'?' selected':''}>ปกติ</option><option value="reverse"${SC.mode=='reverse'?' selected':''}>กลับด้าน (บางรุ่น)</option></select></div><div><label>คำสั่งขอค่า (ถ้าตาชั่งไม่ส่งเอง)</label><input id="c8" value="${esc(SC.cmd)}" placeholder="เช่น P\\r\\n หรือ \\x05"></div></div>
+ <div><label>รูปแบบตัวเลข</label><select id="c7"><option value="auto"${SC.mode=='auto'?' selected':''}>ปกติ</option><option value="reverse"${SC.mode=='reverse'?' selected':''}>กลับด้าน (บางรุ่น)</option></select></div><div><label>ชื่อ/เลขเครื่องชั่งนี้ (บันทึกลงทุกบิล)</label><input id="c12" value="${esc(SC.id)}" placeholder="เช่น ชั่ง 1"></div><div><label>คำสั่งขอค่า (ถ้าตาชั่งไม่ส่งเอง)</label><input id="c8" value="${esc(SC.cmd)}" placeholder="เช่น P\\r\\n หรือ \\x05"></div></div>
  <label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="c9" style="width:auto"${SC.auto?' checked':''}> ดึงน้ำหนักอัตโนมัติเมื่อนิ่ง</label>
  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="c10" style="width:auto"${SC.autoConn?' checked':''}> เชื่อมต่อตาชั่งอัตโนมัติเมื่อเปิดโปรแกรม</label>
  <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="c11" style="width:auto"${SC.lock?' checked':''}${adm?'':' disabled'}> 🔒 ล็อกน้ำหนัก: ห้ามพิมพ์เอง ใช้ค่าจากตาชั่งเท่านั้น (แอดมินเท่านั้น)</label>
@@ -228,7 +265,7 @@ function scaleDlg(){const d=document.createElement('dialog');d.style.cssText='ma
  <div class="row"><button class="dn">ปิด</button><button class="det">🔍 ตรวจหาค่าอัตโนมัติ</button><button class="sv pri">💾 บันทึก</button></div>`;
  document.body.appendChild(d);d.showModal();window._rawEl=d.querySelector('#rawv');rawView();
  const close=()=>{window._rawEl=null;d.remove()};d.querySelector('.dn').onclick=close;d.oncancel=close;d.querySelector('.det').onclick=()=>{close();scDetect()};
- d.querySelector('.sv').onclick=async()=>{const g=i=>d.querySelector('#'+i);Object.assign(SC,{baud:+g('c1').value,data:+g('c2').value,parity:g('c3').value,stop:+g('c4').value,unit:g('c5').value,pick:g('c6').value,mode:g('c7').value,cmd:g('c8').value,auto:g('c9').checked,autoConn:g('c10').checked});
+ d.querySelector('.sv').onclick=async()=>{const g=i=>d.querySelector('#'+i);Object.assign(SC,{baud:+g('c1').value,data:+g('c2').value,parity:g('c3').value,stop:+g('c4').value,unit:g('c5').value,pick:g('c6').value,mode:g('c7').value,cmd:g('c8').value,id:g('c12').value.trim()||'ชั่ง 1',auto:g('c9').checked,autoConn:g('c10').checked});
   if(adm)SC.lock=g('c11').checked;scSave();close();if(scOn){await scClose();await scAuto(true)}scStatus();toast('บันทึกการตั้งค่าตาชั่งแล้ว')}}
 // ---------- POS ----------
 let curCat=null,CATS=[];
@@ -250,7 +287,7 @@ function calcLine(){const p=P.find(x=>x.id==$('pid').value);if(!p)return null;co
 function calc(){const l=calcLine();$('prev').textContent=l?`หักภาชนะ ${f2(l.tare)} กก. · ฿${(l.price/1000).toFixed(3)}/กรัม`:'';$('rnet').textContent=l?f2(l.net):'0.00';$('ramt').textContent='฿'+(l?f2(l.amount):'0.00')}
 function addLine(){const l=calcLine();if(!l||l.gross<=0||l.net<=0)return toast('กรอกน้ำหนักให้ถูกต้อง');if(l.price<=0)return toast('สินค้านี้ยังไม่ได้ตั้งราคา (ให้แอดมินตั้งราคาก่อน)');if(!wph.length)snap();if(!wph.length)return toast('ต้องมีรูปอย่างน้อย 1 รูป (เปิดกล้องแล้วกดถ่าย)');l.photos=[...wph];l.photo=l.photos[0];l.src=gsrc;cur.lines.push(l);wph=[];rPh();$('gross').value='';$('wd').close();rLines()}
 const TRASH=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>`;
-function rLines(){$('bmeta').textContent=new Date().toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})+' · ผู้ชั่ง: '+(ME?.name||'');const t=cur.lines.reduce((a,l)=>a+l.amount,0),n=cur.lines.reduce((a,l)=>a+l.net,0);
+function rLines(){$('bmeta').textContent=new Date().toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})+' · ผู้ชั่ง: '+(ME?.name||'')+' · '+SC.id;const t=cur.lines.reduce((a,l)=>a+l.amount,0),n=cur.lines.reduce((a,l)=>a+l.net,0);
  $('lines').innerHTML=cur.lines.map((l,i)=>`<div class="ln"><div><div class="ln-name">${i+1}. ${esc(l.name)}<span class="pchip">฿${f2(l.price)}/กก.</span></div><div class="m">รวม ${f2(l.gross)} · หัก ${f2(l.tare)}${l.pct?' · เจือปน '+l.pct+'%':''} = <b>${f2(l.net)}</b> กก.</div></div>
  <div class="ln-side"><b>฿${f2(l.amount)}</b><div class="ln-act">${l.photo?`<img class="th" src="${l.photo}">`:''}<button class="ic del" aria-label="ลบรายการ" onclick="delLine(${i})">${TRASH}</button></div></div></div>`).join('')||'<div class="m" style="text-align:center;padding:24px 0">กดสินค้าทางซ้ายเพื่อเริ่มชั่ง</div>';
  $('cnt').textContent=cur.lines.length;$('tnet').textContent=f2(n)+' กก.';$('total').textContent='฿'+f2(t)}
@@ -260,7 +297,7 @@ async function cancelBill(){if(!cur.lines.length&&!$('seller').value)return;if(a
 function resetBill(){cur={lines:[],photos:[]};$('seller').value='';rLines();rPh()}
 async function saveBill(){if(saving)return;if(!cur.lines.length)return toast('ยังไม่มีรายการ');saving=true;
  try{const total=r2(cur.lines.reduce((a,l)=>a+l.amount,0));
- const{data:b,error}=await sb.from('bills').insert({seller_name:$('seller').value.trim()||'ลูกค้าทั่วไป',total}).select().single();if(error)throw error;
+ const b=await insBill({seller_name:$('seller').value.trim()||'ลูกค้าทั่วไป',total,scale_no:SC.id});
  await insItems(cur.lines.map(l=>({bill_id:b.id,product_id:l.pid,product_name:l.name,price_per_kg:l.price,gross_kg:l.gross,tare_kg:l.tare,impurity_pct:l.pct,net_kg:l.net,amount:l.amount,weight_src:l.src||'manual'})));
  for(const[i,l]of cur.lines.entries())for(const[j,p]of(l.photos||[l.photo]).entries()){const path=b.id+'/l'+i+'_'+j+'.jpg',{error:e3}=await sb.storage.from('bill-photos').upload(path,await(await fetch(p)).blob(),{contentType:'image/jpeg'});if(e3)toast('อัปโหลดรูปไม่สำเร็จ: '+e3.message);else await sb.from('bill_photos').insert({bill_id:b.id,path,product_name:l.name})}
  toast('บันทึกบิล '+b.bill_no+' แล้ว');resetBill();await loadB();if(await dlg('บันทึกบิล '+b.bill_no+' แล้ว ส่งให้ผู้จ่ายเงินเรียบร้อย',{ok:'🖨 พิมพ์ใบรับ',no:'ปิด'}))printBill(b.id)}catch(e){toast('บันทึกไม่สำเร็จ: '+e.message)}finally{saving=false}}
@@ -269,9 +306,12 @@ function rAdmin(soft){if(soft&&document.querySelector('#bdlg[open]'))return;cons
  el.innerHTML='<div class="card"><label>สถานะ</label><select id="fs" onchange="rAdmin()"><option value="pending">รออนุมัติ</option><option value="">ทั้งหมด</option><option value="approved">อนุมัติแล้ว</option><option value="rejected">ปฏิเสธ</option><option value="void">ยกเลิก</option></select><label style="margin-top:6px">ผู้ชั่ง</label><select id="fw"></select></div><div id="bl"></div>';
  const fs=el.dataset.fs??'pending',fw=el.dataset.fw||'';$('fs').value=fs;$('fs').onchange=()=>{el.dataset.fs=$('fs').value;rAdmin()};
  $('fw').innerHTML='<option value="">ทุกคน</option>'+[...new Set(B.map(b=>b.recorder).filter(Boolean))].map(n=>`<option${n==fw?' selected':''}>${esc(n)}</option>`).join('');$('fw').onchange=()=>{el.dataset.fw=$('fw').value;rAdmin()};
- $('bl').innerHTML=B.filter(b=>(!fs||b.status==fs)&&(!fw||b.recorder==fw)).map(b=>`<div class="card" onclick="showBill('${b.id}')" style="cursor:pointer"><b>${b.no}</b> <span class="bd ${b.status}">${{pending:'รอจ่าย',approved:'จ่ายแล้ว',rejected:'ปฏิเสธ',void:'ยกเลิก'}[b.status]}</span><div class="m">${esc(b.seller)} · ผู้ชั่ง: ${esc(b.recorder)} · ${new Date(b.ts).toLocaleString('th-TH')}</div><div class="tot">฿${f2(b.total)}</div></div>`).join('')||'<div class="m">ไม่มีรายการ</div>'}
+ const ST={pending:'รอจ่าย',approved:'จ่ายแล้ว',rejected:'ปฏิเสธ',void:'ยกเลิก'},L=B.filter(b=>(!fs||b.status==fs)&&(!fw||b.recorder==fw)).sort((a,b)=>fs=='pending'?a.ts-b.ts:b.ts-a.ts),pn=B.filter(b=>b.status=='pending'),now=Date.now();
+ $('bl').innerHTML=`<div class="card inbox"><b style="font-size:18px">📥 กล่องรอจ่ายเงิน</b> <span class="bd pending">${pn.length} บิล</span> <b style="color:var(--p)">฿${f2(pn.reduce((a,b)=>a+b.total,0))}</b><div class="m">เรียงตามลำดับเข้าคิว (เก่าสุดก่อน) · อัปเดตทันทีเมื่อมีบิลใหม่ · แถวสีเหลือง = เข้ามาภายใน 1 นาที</div></div>
+ <div class="card" style="overflow-x:auto"><table><tr><th>คิว</th><th>วัน/เวลา</th><th>เลขบิล</th><th>เครื่องชั่ง</th><th>ผู้ชั่ง</th><th>ผู้ขาย</th><th class="n">ยอด (฿)</th><th>สถานะ</th><th></th></tr>`+
+ (L.map((b,i)=>`<tr style="${b.status=='pending'&&now-b.ts<60000?'background:#fef9c3;color:#222':''}"><td>${fs=='pending'?i+1:''}</td><td>${new Date(b.ts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'medium'})}</td><td><b>${b.no}</b></td><td>${esc(b.scale||'-')}</td><td>${esc(b.recorder)}</td><td>${esc(b.seller)}</td><td class="n"><b>${f2(b.total)}</b></td><td><span class="bd ${b.status}">${ST[b.status]}</span></td><td><button onclick="showBill('${b.id}')">${b.status=='pending'&&cash?'ตรวจ/จ่าย':'ดู'}</button></td></tr>`).join('')||'<tr><td colspan="9" class="m">ไม่มีรายการ</td></tr>')+'</table></div>'}
 async function showBill(id){const b=B.find(x=>x.id==id)||HB.find(x=>x.id==id);let d=document.createElement('dialog');d.id='bdlg';d.style.cssText='max-width:640px;width:95%;border-radius:12px;background:var(--c);color:var(--t)';
- d.innerHTML=`<b>บิล ${b.no}</b><div class="m">${esc(b.seller)} · ผู้ชั่ง: ${esc(b.recorder)}${b.payer?' · จ่ายโดย '+esc(b.payer):''}</div><div class="ph" id="dph"><span class="m">กำลังโหลดรูป...</span></div>
+ d.innerHTML=`<b>บิล ${b.no}</b><div class="m">${esc(b.seller)} · เครื่อง ${esc(b.scale||'-')} · ผู้ชั่ง: ${esc(b.recorder)}${b.payer?' · จ่ายโดย '+esc(b.payer):''}</div><div class="ph" id="dph"><span class="m">กำลังโหลดรูป...</span></div>
  <table><tr><th>สินค้า</th><th class="n">รวม</th><th class="n">หัก</th><th class="n">สุทธิ</th><th class="n">฿/กก.</th><th class="n">เงิน</th></tr>${b.lines.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${f2(l.gross)}</td><td class="n">${f2(l.tare)}</td><td class="n">${f2(l.net)}</td><td class="n">${f2(l.price)}</td><td class="n">${f2(l.amount)}</td></tr>`).join('')}</table><div class="tot">฿${f2(b.total)}</div>
  <div class="row" style="margin-top:8px"><button onclick="this.closest('dialog').remove()">ปิด</button><button onclick="printBill('${b.id}')">🖨 ใบเสร็จ</button>${adm&&b.status!='void'?`<button class="dan" onclick="voidBill('${b.id}')">ยกเลิกบิล</button>`:''}${b.status=='pending'&&cash?`<button class="dan" onclick="setSt('${b.id}','rejected')">ปฏิเสธ</button><button class="pri" onclick="setSt('${b.id}','approved')">✔ อนุมัติ/จ่ายเงิน</button>`:''}</div>`;
  document.body.appendChild(d);d.showModal();
@@ -280,7 +320,7 @@ async function showBill(id){const b=B.find(x=>x.id==id)||HB.find(x=>x.id==id);le
  const{data:u}=await sb.storage.from('bill-photos').createSignedUrls(ph.map(x=>x.path),3600);box.innerHTML=(u||[]).map(x=>`<img src="${x.signedUrl}" style="height:110px">`).join('')}
 async function setSt(id,st){const{error}=await sb.from('bills').update({status:st,approved_by:ME.id,approved_at:new Date().toISOString()}).eq('id',id);if(error)return toast(error.message);document.getElementById('bdlg')?.remove();await loadB();rAdmin();toast('อัปเดตแล้ว')}
 function printBill(id){const b=B.find(x=>x.id==id)||HB.find(x=>x.id==id),w=window.open('','_blank','width=380,height=600');
- w.document.write(`<html><meta charset=utf-8><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet"><body style="font:13px/1.5 Prompt,sans-serif;width:72mm"><center><b>${esc(S.shop)}</b><br>ใบรับซื้อสินค้า<br>เลขที่ ${b.no}<br>${new Date(b.ts).toLocaleString('th-TH')}</center>ผู้ขาย: ${esc(b.seller)}<br>ผู้ชั่ง: ${esc(b.recorder)}<hr>${b.lines.map(l=>`${esc(l.name)}<br>&nbsp;สุทธิ ${f2(l.net)} กก. x ${f2(l.price)} = ${f2(l.amount)}<br>&nbsp;<small>(รวม ${f2(l.gross)} หัก ${f2(l.tare)}${l.pct?' เจือปน '+l.pct+'%':''})</small><br>`).join('')}<hr><b>รวมสุทธิ ${f2(b.total)} บาท</b><br><br>ลงชื่อผู้ขาย ____________<script>document.fonts.ready.then(()=>print())<\/script>`);w.document.close()}
+ w.document.write(`<html><meta charset=utf-8><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet"><body style="font:13px/1.5 Prompt,sans-serif;width:72mm"><center><b>${esc(S.shop)}</b><br>ใบรับซื้อสินค้า<br>เลขที่ ${b.no}<br>${new Date(b.ts).toLocaleString('th-TH')}</center>ผู้ขาย: ${esc(b.seller)}<br>ผู้ชั่ง: ${esc(b.recorder)} (${esc(b.scale||'-')})<hr>${b.lines.map(l=>`${esc(l.name)}<br>&nbsp;สุทธิ ${f2(l.net)} กก. x ${f2(l.price)} = ${f2(l.amount)}<br>&nbsp;<small>(รวม ${f2(l.gross)} หัก ${f2(l.tare)}${l.pct?' เจือปน '+l.pct+'%':''})</small><br>`).join('')}<hr><b>รวมสุทธิ ${f2(b.total)} บาท</b><br><br>ลงชื่อผู้ขาย ____________<script>document.fonts.ready.then(()=>print())<\/script>`);w.document.close()}
 // ---------- history / cancelled ----------
 let hseg='paid';
 async function rHist(){const el=$('hist'),d=el.dataset.d||new Date().toISOString().slice(0,10);el.dataset.d=d;const A=el.dataset.a=='1';
@@ -309,7 +349,7 @@ async function rAudit(){const el=$('audit'),d=el.dataset.d||new Date().toISOStri
  const un=bs.filter(b=>b.audit=='none').length,fl=bs.filter(b=>b.audit=='flagged').length,tot=bs.reduce((a,b)=>a+b.total,0);
  el.innerHTML=`<div class="card row"><div><label>วันที่</label><input type="date" value="${d}" onchange="$('audit').dataset.d=this.value;rAudit()"></div><div><b>${bs.length}</b> บิล · ฿${f2(tot)}</div><div>รอตรวจรูป <b>${un}</b> · พบผิดปกติ <b style="color:var(--d)">${fl}</b></div></div><div class="m" style="margin:-4px 0 8px">ตรวจรูปเทียบกับสินค้าที่เลือก (แยกจากการจ่ายเงิน) — ตรงกันกด ✅ ผิดปกติกด ⚠️</div>`+
  bs.map(b=>`<div class="card"><b>${b.no}</b> <span class="bd ${b.status}">${b.status=='pending'?'รอจ่าย':'จ่ายแล้ว'}</span> ${b.audit=='ok'?'✅ ตรวจแล้ว':b.audit=='flagged'?'⚠️ พบผิดปกติ: '+esc(b.anote):''}
- <div class="m">${esc(b.seller)} · เสมียน ${esc(b.recorder)} · ${new Date(b.ts).toLocaleTimeString('th-TH')}</div>
+ <div class="m">${esc(b.seller)} · เสมียน ${esc(b.recorder)} · เครื่อง ${esc(b.scale||'-')} · ${new Date(b.ts).toLocaleTimeString('th-TH')}</div>
  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin:8px 0">${ph.filter(x=>x.bill_id==b.id).map(x=>`<div><img src="${U[x.path]}" style="width:100%;border-radius:8px;cursor:pointer" onclick="window.open(this.src)"><div style="font-size:13px"><b>${x.product_name?'ที่เลือก: '+esc(x.product_name):'รูปเพิ่มเติม'}</b></div></div>`).join('')||'<span class="m">⚠️ ไม่มีรูปในบิลนี้</span>'}</div>
  <table>${b.lines.map(l=>`<tr><td>${esc(l.name)} ${l.src=='scale'?'<span class="bd approved">⚖ ตาชั่ง</span>':l.src=='manual'?'<span class="bd pending">✍ พิมพ์เอง</span>':''}</td><td class="n">สุทธิ ${f2(l.net)} กก.</td><td class="n">฿${f2(l.amount)}</td></tr>`).join('')}</table><div class="tot">฿${f2(b.total)}</div>
  <div class="row"><button onclick="setAudit('${b.id}','ok')">✅ ตรงกัน</button><button onclick="setAudit('${b.id}','flagged')">⚠️ ผิดปกติ</button><button class="dan" onclick="voidBill('${b.id}')">ยกเลิกบิล</button></div></div>`).join('')||'<div class="m">ไม่มีบิลในวันนี้</div>'}
@@ -393,7 +433,7 @@ async function tkLight(i){const l=TK.lines[i],g=await numDlg({title:'น้ำ�
 async function tkDelLine(i){if(!await dlg('ลบรายการ "'+TK.lines[i].name+'" ?',{ok:'ลบ',danger:true}))return;TK.lines.splice(i,1);if(TK.exists)await tkSave();tkRender()}
 async function tkFinish(){tkSync();if(!TK.plate)return toast('กรอกทะเบียนรถ');if(!TK.lines.length)return toast('ยังไม่มีรายการ');if(TK.lines.some(l=>l.net==null))return toast('ยังมีรายการรอชั่งรถเบา');
  const total=r2(TK.lines.reduce((a,l)=>a+l.amount,0));if(!await dlg('บันทึกการรับซื้อ ยอดรวม ฿'+f2(total)+' ?',{ok:'บันทึก'}))return;
- const{data:b,error}=await sb.from('bills').insert({seller_name:TK.seller||'ลูกค้าทั่วไป',note:'รถทะเบียน '+TK.plate,total}).select().single();if(error)throw error;
+ const b=await insBill({seller_name:TK.seller||'ลูกค้าทั่วไป',note:'รถทะเบียน '+TK.plate,total,scale_no:SC.id});
  const{error:e2}=await sb.from('bill_items').insert(TK.lines.map(l=>({bill_id:b.id,product_id:l.pid,product_name:l.name,price_per_kg:l.price,gross_kg:r2(l.heavy-l.light),tare_kg:l.deduct,impurity_pct:0,net_kg:l.net,amount:l.amount})));if(e2)throw e2;
  for(const l of TK.lines)for(const[pt,lb]of[[l.ph,' · รถหนัก'],[l.pl,' · รถเบา']])if(pt)await sb.from('bill_photos').insert({bill_id:b.id,path:pt,product_name:l.name+lb});
  await sb.from('truck_tickets').update({plate:TK.plate,seller_name:TK.seller||'ลูกค้าทั่วไป',lines:TK.lines,status:'done',bill_id:b.id,updated_at:new Date().toISOString()}).eq('id',TK.id);
@@ -430,10 +470,10 @@ function csv(){const rows=[['เลขที่','วันที่','ผู้
  dl('report.csv','\ufeff'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n'),'text/csv')}
 function dl(n,t,ty){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:ty}));a.download=n;a.click()}
 // ---------- settings ----------
-function rSet(){$('set').innerHTML=`<div class="card g"><div><label>ชื่อร้าน (บนใบเสร็จ)</label><input id="s1" value="${esc(S.shop)}"></div><div><label>หน่วยที่ตาชั่งส่งมา</label><select id="s5"><option value="kg">กิโลกรัม</option><option value="g">กรัม</option></select></div></div>
+function rSet(){$('set').innerHTML=`<div class="card g"><div><label>ชื่อร้าน (บนใบเสร็จ)</label><input id="s1" value="${esc(S.shop)}"></div><div><label>แป้นพิมพ์บนหน้าจอ (เครื่องนี้)</label><select id="s6"><option value="auto">อัตโนมัติ (เฉพาะคอมทัชสกรีน)</option><option value="on">เปิดเสมอ</option><option value="off">ปิด</option></select></div></div>
 <div class="card"><b>ภาชนะ/ตะกร้า</b><table>${T.map(t=>`<tr><td>${esc(t.n)}</td><td class="n">${t.w} กก.</td><td><button onclick="delTare('${t.id}')">ลบ</button></td></tr>`).join('')}</table>
 <div class="row"><div><label>ชื่อ</label><input id="tn"></div><div><label>น้ำหนัก (กก.)</label><input id="tw" type="number" step="0.001"></div><button class="pri" onclick="addTare()">เพิ่ม</button></div></div>
-<div class="card"><button class="pri" onclick="saveSet()">บันทึกตั้งค่า</button></div>`;$('s5').value=S.unit;$('set').insertAdjacentHTML('beforeend','<div class="card"><b>ผู้ใช้งาน</b><div id="ul"></div><div class="m" style="margin-top:6px">ผู้ใช้ใหม่เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่ตั้งไว้</div></div>');loadUsers();pinCard()}
+<div class="card"><button class="pri" onclick="saveSet()">บันทึกตั้งค่า</button></div>`;$('s6').value=oskMode();$('set').insertAdjacentHTML('beforeend','<div class="card"><b>ผู้ใช้งาน</b><div id="ul"></div><div class="m" style="margin-top:6px">ผู้ใช้ใหม่เข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่ตั้งไว้</div></div>');loadUsers();pinCard()}
 function chPw(){const d=document.createElement('dialog');d.style.cssText='max-width:380px;width:92%;border-radius:12px;background:var(--c);color:var(--t)';
  d.innerHTML='<b>🔑 เปลี่ยนรหัสผ่านของฉัน</b><label style="margin-top:8px">รหัสผ่านใหม่ (6 ตัวขึ้นไป)</label><input id="pw1" type="password"><label style="margin-top:8px">ยืนยันรหัสผ่านใหม่</label><input id="pw2" type="password"><div id="pwe" class="m" style="color:var(--d);margin-top:6px"></div><div class="row" style="margin-top:10px"><button class="c">ยกเลิก</button><button class="pri o">บันทึก</button></div>';
  document.body.appendChild(d);d.showModal();d.querySelector('.c').onclick=()=>d.remove();
@@ -464,12 +504,11 @@ async function delUser(id){const u=UL.find(x=>x.id==id);if(!await dlg('ลบผ
  const m=await fn({action:'delete',user_id:id});if(m)return toast(m);toast('ลบผู้ใช้แล้ว');loadUsers()}
 async function setRole(id,r){const{error}=await sb.from('profiles').update({role:r}).eq('id',id);toast(error?error.message:'เปลี่ยนบทบาทแล้ว')}
 async function setName(id,n){const{error}=await sb.from('profiles').update({name:n.trim()||'-'}).eq('id',id);toast(error?error.message:'แก้ชื่อแล้ว')}
-function saveSet(){S.shop=$('s1').value;$('shopn').textContent=S.shop;S.unit=$('s5').value;localStorage.setItem('mk_set',JSON.stringify({shop:S.shop,unit:S.unit}));toast('บันทึกแล้ว')}
+function saveSet(){S.shop=$('s1').value;$('shopn').textContent=S.shop;localStorage.setItem('mk_osk',$('s6').value);localStorage.setItem('mk_set',JSON.stringify({shop:S.shop,unit:S.unit}));toast('บันทึกแล้ว')}
 async function addTare(){const n=$('tn').value.trim(),w=+$('tw').value;if(!n||!(w>=0))return toast('กรอกให้ครบ');const{error}=await sb.from('tare_presets').insert({name:n,weight_kg:w});if(error)return toast(error.message);await loadAll();rSet()}
 async function delTare(id){await sb.from('tare_presets').delete().eq('id',id);await loadAll();rSet()}
 boot();
-</script> 
- <script>
+</script><script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
