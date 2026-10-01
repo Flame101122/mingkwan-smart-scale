@@ -260,7 +260,7 @@ async function cancelBill(){if(!cur.lines.length&&!$('seller').value)return;if(a
 function resetBill(){cur={lines:[],photos:[]};$('seller').value='';rLines();rPh()}
 async function saveBill(){if(saving)return;if(!cur.lines.length)return toast('ยังไม่มีรายการ');saving=true;
  try{const total=r2(cur.lines.reduce((a,l)=>a+l.amount,0));
- const{data:b,error}=await sb.from('bills').insert({seller_name:$('seller').value.trim()||'ลูกค้าทั่วไป',total,recorder_id:ME.id}).select().single();if(error)throw error;
+ const{data:b,error}=await sb.from('bills').insert({seller_name:$('seller').value.trim()||'ลูกค้าทั่วไป',total}).select().single();if(error)throw error;
  const{error:e2}=await sb.from('bill_items').insert(cur.lines.map(l=>({bill_id:b.id,product_id:l.pid,product_name:l.name,price_per_kg:l.price,gross_kg:l.gross,tare_kg:l.tare,impurity_pct:l.pct,net_kg:l.net,amount:l.amount})));if(e2)throw e2;
  for(const[i,l]of cur.lines.entries())for(const[j,p]of(l.photos||[l.photo]).entries()){const path=b.id+'/l'+i+'_'+j+'.jpg',{error:e3}=await sb.storage.from('bill-photos').upload(path,await(await fetch(p)).blob(),{contentType:'image/jpeg'});if(e3)toast('อัปโหลดรูปไม่สำเร็จ: '+e3.message);else await sb.from('bill_photos').insert({bill_id:b.id,path,product_name:l.name})}
  toast('บันทึกบิล '+b.bill_no+' แล้ว');resetBill();await loadB();if(await dlg('บันทึกบิล '+b.bill_no+' แล้ว ส่งให้ผู้จ่ายเงินเรียบร้อย',{ok:'🖨 พิมพ์ใบรับ',no:'ปิด'}))printBill(b.id)}catch(e){toast('บันทึกไม่สำเร็จ: '+e.message)}finally{saving=false}}
@@ -377,7 +377,7 @@ async function tkLight(i){const l=TK.lines[i],g=await numDlg({title:'น้ำ�
 async function tkDelLine(i){if(!await dlg('ลบรายการ "'+TK.lines[i].name+'" ?',{ok:'ลบ',danger:true}))return;TK.lines.splice(i,1);if(TK.exists)await tkSave();tkRender()}
 async function tkFinish(){tkSync();if(!TK.plate)return toast('กรอกทะเบียนรถ');if(!TK.lines.length)return toast('ยังไม่มีรายการ');if(TK.lines.some(l=>l.net==null))return toast('ยังมีรายการรอชั่งรถเบา');
  const total=r2(TK.lines.reduce((a,l)=>a+l.amount,0));if(!await dlg('บันทึกการรับซื้อ ยอดรวม ฿'+f2(total)+' ?',{ok:'บันทึก'}))return;
- const{data:b,error}=await sb.from('bills').insert({seller_name:TK.seller||'ลูกค้าทั่วไป',note:'รถทะเบียน '+TK.plate,total,recorder_id:ME.id}).select().single();if(error)throw error;
+ const{data:b,error}=await sb.from('bills').insert({seller_name:TK.seller||'ลูกค้าทั่วไป',note:'รถทะเบียน '+TK.plate,total}).select().single();if(error)throw error;
  const{error:e2}=await sb.from('bill_items').insert(TK.lines.map(l=>({bill_id:b.id,product_id:l.pid,product_name:l.name,price_per_kg:l.price,gross_kg:r2(l.heavy-l.light),tare_kg:l.deduct,impurity_pct:0,net_kg:l.net,amount:l.amount})));if(e2)throw e2;
  for(const l of TK.lines)for(const[pt,lb]of[[l.ph,' · รถหนัก'],[l.pl,' · รถเบา']])if(pt)await sb.from('bill_photos').insert({bill_id:b.id,path:pt,product_name:l.name+lb});
  await sb.from('truck_tickets').update({plate:TK.plate,seller_name:TK.seller||'ลูกค้าทั่วไป',lines:TK.lines,status:'done',bill_id:b.id,updated_at:new Date().toISOString()}).eq('id',TK.id);
