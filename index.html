@@ -916,6 +916,68 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
   const H=out.reduce((a,x)=>a+x.h,0)+24,cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W,H);c.fillStyle='#000';let y=8;for(const x of out){x.d(c,y);y+=x.h}return cv};
 })();
 </script>
+<script>
+// ===== r14 add-on: ใบรับ — รวมสินค้าชื่อเดียวกันเป็นกลุ่ม + สรุปท้ายกลุ่ม + โลโก้ KHW =====
+// ไม่แตะข้อมูลในฐานข้อมูล/บิลเดิม: จัดกลุ่มเฉพาะตอนแสดงผลใบรับ
+// เขียนทับ rcRows (ใช้ร่วมกันทั้งพิมพ์ผ่านเบราว์เซอร์ + ESC/POS + ใบร่าง + ทดสอบพิมพ์) และห่อ rcHtml / rcCanvas เพื่อใส่โลโก้
+(function(){
+ if(window.__mk14)return;window.__mk14=1;
+ const SUM_SINGLE=false; // true = แสดงสรุปท้ายกลุ่มแม้สินค้านั้นชั่งครั้งเดียว
+
+ window.rcRows=function(rc){
+  const R=[],t=new Date(rc.ts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'});
+  R.push({k:'c',a:rc.shop,bold:1,big:1},{k:'c',a:rc.title},{k:'l',a:'เลขที่ '+rc.no},{k:'l',a:'วันที่ '+t},{k:'l',a:'ผู้ขาย: '+rc.seller},{k:'l',a:'ผู้ชั่ง: '+rc.weigher+' ('+rc.scale+')'});
+  if(rc.note)R.push({k:'l',a:rc.note});
+  R.push({k:'hr'});
+
+  // จัดกลุ่มตามชื่อสินค้า — ลำดับกลุ่ม = ลำดับที่ปรากฏครั้งแรก, ลำดับในกลุ่ม = ลำดับการชั่งจริง
+  const G=new Map();
+  rc.lines.forEach(l=>{if(!G.has(l.name))G.set(l.name,[]);G.get(l.name).push(l)});
+
+  G.forEach((ls,name)=>{
+   R.push({k:'l',a:name,bold:1});
+   ls.forEach((l,i)=>{
+    const n=ls.length>1?(i+1)+') ':'';
+    if(l.pending){R.push({k:'l',a:'  '+n+'รถหนัก '+f2(l.heavy)+' กก. (รอชั่งรถเบา)',small:1});return}
+    R.push({k:'lr',a:'  '+n+f2(l.net)+' กก. x '+f2(l.price),b:f2(l.amount)});
+    R.push({k:'l',a:l.truck?'  (รถหนัก '+f2(l.heavy)+' - รถเบา '+f2(l.light)+(l.tare?' - หัก '+f2(l.tare):'')+')':'  (รวม '+f2(l.gross)+' หัก '+f2(l.tare)+(l.pct?' เจือปน '+l.pct+'%':'')+')',small:1});
+   });
+   // สรุปท้ายกลุ่ม (คิดจากรายการจริงที่ชั่งเสร็จแล้ว ไม่บวกซ้ำ)
+   const done=ls.filter(l=>!l.pending);
+   if(done.length>1||(SUM_SINGLE&&done.length)){
+    const net=r2(done.reduce((a,l)=>a+(+l.net||0),0)),tare=r2(done.reduce((a,l)=>a+(+l.tare||0),0)),amt=r2(done.reduce((a,l)=>a+(+l.amount||0),0));
+    R.push({k:'lr',a:'  รวม '+done.length+' ครั้ง น้ำหนักสุทธิ',b:f2(net)+' กก.',bold:1},
+           {k:'lr',a:'  ภาชนะ/หักรวม',b:f2(tare)+' กก.',small:1},
+           {k:'lr',a:'  ยอดรวม '+name,b:f2(amt),bold:1});
+   }
+  });
+
+  R.push({k:'hr'},{k:'lr',a:'รวมสุทธิ',b:f2(rc.total)+' บาท',bold:1,big:1},{k:'sp'},{k:'l',a:'ลงชื่อผู้ขาย ______________'},{k:'sp'},{k:'c',a:'ขอบคุณที่ใช้บริการ',small:1});
+  return R};
+
+ // ---- โลโก้: พิมพ์ผ่านเบราว์เซอร์ (K,H ดำ / W เทาเข้ม) ----
+ const html0=window.rcHtml;
+ window.rcHtml=function(rc){
+  const logo='<div style="text-align:center;font:900 34px/1 Prompt,sans-serif;letter-spacing:3px;margin:0 0 3px;-webkit-print-color-adjust:exact;print-color-adjust:exact"><span style="color:#000">KH</span><span style="color:#555;-webkit-text-stroke:.5px #333">W</span></div>';
+  return html0(rc).replace('<body>','<body>'+logo)};
+
+ // ---- โลโก้: ESC/POS (ภาพขาวดำ) — W ใช้ลายจุดสลับ + ขอบดำบาง ให้ดูเป็นเทาแต่ยังอ่านชัด ----
+ const cv0=window.rcCanvas;
+ window.rcCanvas=async function(rc){
+  const cv=await cv0(rc),W=cv.width,fs=W==384?54:66,LH=Math.round(fs*1.3);
+  try{await document.fonts.load('900 '+fs+'px Prompt')}catch(e){}
+  const o=document.createElement('canvas');o.width=W;o.height=cv.height+LH;const c=o.getContext('2d');
+  c.fillStyle='#fff';c.fillRect(0,0,W,o.height);
+  c.font='900 '+fs+'px Prompt,sans-serif';c.textBaseline='top';c.textAlign='left';
+  const gap=Math.round(fs*.1),L=['K','H','W'],w=L.map(ch=>c.measureText(ch).width);
+  let x=(W-(w[0]+w[1]+w[2]+gap*2))/2;const y=4;
+  c.fillStyle='#000';c.fillText('K',x,y);x+=w[0]+gap;c.fillText('H',x,y);x+=w[1]+gap;
+  const p=document.createElement('canvas');p.width=p.height=2;const pc=p.getContext('2d');pc.fillStyle='#000';pc.fillRect(0,0,1,1);pc.fillRect(1,1,1,1);
+  c.fillStyle=c.createPattern(p,'repeat');c.fillText('W',x,y);
+  c.strokeStyle='#000';c.lineWidth=Math.max(2,fs*.04);c.lineJoin='round';c.strokeText('W',x,y);
+  c.drawImage(cv,0,LH);return o};
+})();
+</script>
 
 <script>
 // ===== r13 add-on: แดชบอร์ดกราฟแนวโน้ม (เลือกช่วงอิสระ) + เมนู "ปิดวัน/สรุปยอด" =====
