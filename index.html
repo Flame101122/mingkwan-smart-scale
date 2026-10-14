@@ -767,7 +767,125 @@ function saveSet(){S.shop=$('s1').value;$('shopn').textContent=S.shop;localStora
 async function addTare(){const n=$('tn').value.trim(),w=+$('tw').value;if(!n||!(w>=0))return toast('กรอกให้ครบ');const{error}=await sb.from('tare_presets').insert({name:n,weight_kg:w});if(error)return toast(error.message);await loadAll();rSet()}
 async function delTare(id){await sb.from('tare_presets').delete().eq('id',id);await loadAll();rSet()}
 boot();
-</script><script>
+</script>
+<script>
+// ===== r11 add-on: สีตามหมวดหมู่ + แก้ไขสินค้า (สตีอก / สินค้า-ราคา) =====
+const MKPAL=['#ffd6a5','#fdffb6','#caffbf','#9bf6ff','#a0c4ff','#bdb2ff','#ffc6ff','#ffadad','#d0f4de','#fcf6bd','#e4c1f9','#a9def9','#f6bd60','#cdeac0','#f7d6e0','#b5ead7'];
+const MKDEF=['','#e9ecef','#eee','#eeeeee','#fff','#ffffff'];
+const mkHex=c=>/^#[0-9a-f]{6}$/i.test(c||'')?c:'#e9ecef';
+// สีประจำหมวด (คงที่ตามชื่อหมวด)
+function catColor(c){let h=0;for(const ch of String(c||''))h=(h*31+ch.charCodeAt(0))>>>0;return MKPAL[h%MKPAL.length]}
+// สีที่ใช้แสดงจริง: ถ้าสินค้ายังไม่ได้เลือกสี (ว่าง/เทาเริ่มต้น) ใช้สีตามหมวด
+function pcol(p){return MKDEF.includes(String(p.color||'').toLowerCase())?catColor(p.cat):p.color}
+// สีที่แสดงในช่องเลือกสีของหมวด = สีของสินค้าตัวแรกในหมวดที่เลือกสีไว้แล้ว ไม่มีก็ใช้สีอัตโนมัติ
+function catShown(c){const x=P.find(p=>p.cat==c&&!MKDEF.includes(String(p.color||'').toLowerCase()));return mkHex(x?x.color:catColor(c))}
+document.head.insertAdjacentHTML('beforeend','<style>#grid{align-content:start}.chip.cc{border-left-width:8px;border-left-style:solid}</style>');
+
+// ---------- หน้าชั่ง: ปุ่มสินค้า + หมวดมีสี ----------
+function renderPos(){CATS=[...new Set(P.map(p=>p.cat))];if(!CATS.includes(curCat))curCat=CATS[0];
+ $('cats').innerHTML=CATS.map((c,i)=>`<button class="chip cc${c==curCat?' on':''}" style="border-left-color:${catColor(c)}" onclick="setCat(${i})">${esc(c)}</button>`).join('');
+ $('grid').innerHTML=pFilter().map(p=>`<button class="pb" style="background:${esc(pcol(p))}" onclick="openW('${p.id}')">${esc(p.name)}<br><small>฿${f2(p.price)}/กก.</small></button>`).join('')||'<span class="m">ยังไม่มีสินค้าในหมวดนี้</span>';
+ $('npad').innerHTML=['7','8','9','4','5','6','1','2','3','.','0','<'].map(k=>`<button onclick="pad('${k}')">${k=='<'?'⌫':k}</button>`).join('')+'<button style="grid-column:1/-1;background:#ffc9c9" onclick="pad(\'C\')">ล้าง</button>'}
+
+// ---------- หน้าต่างเลือกสินค้า (เพิ่มสินค้า/กิโลใหญ่) ----------
+function pickProd(){return new Promise(r=>{const d=document.createElement('dialog'),cats=[...new Set(P.map(p=>p.cat))];let ci=0,q='';d.style.cssText='max-width:640px;width:96%;border-radius:14px;background:var(--c);color:var(--t)';
+ d.innerHTML='<div class="row" style="align-items:center"><b style="font-size:20px;flex:3">เลือกสินค้า</b><button class="x">✕ ปิด</button></div><input class="q" placeholder="🔍 พิมพ์ชื่อหรือรหัสสินค้า" style="margin-top:8px"><div class="cg" style="margin-top:8px"><div class="cc" style="display:flex;flex-direction:column;gap:6px"></div><div class="pp" style="display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow:auto"></div></div>';
+ const draw=()=>{d.querySelector('.cc').innerHTML=cats.map((c,i)=>`<button class="chip cc${i==ci&&!q?' on':''}" style="border-left-color:${catColor(c)}" data-i="${i}">${i+1}. ${esc(c)}</button>`).join('');
+  const L=q?P.filter(p=>(p.name+' '+p.code+' '+p.cat).toLowerCase().includes(q)):P.filter(p=>p.cat==cats[ci]);
+  d.querySelector('.pp').innerHTML=L.map(p=>`<button data-p="${p.id}" style="text-align:left;background:${esc(pcol(p))};color:#2b2b2b"><b>${esc(p.code)}</b> ${esc(p.name)} <small>฿${f2(p.price)}</small></button>`).join('')||'<span class="m">ไม่พบสินค้า</span>';
+  d.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{ci=+b.dataset.i;q='';d.querySelector('.q').value='';draw()});d.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{d.remove();r(P.find(x=>x.id==b.dataset.p))})};
+ d.querySelector('.x').onclick=()=>{d.remove();r(null)};const qi=d.querySelector('.q');qi.oninput=()=>{q=qi.value.trim().toLowerCase();draw()};qi.onkeydown=e=>{if(e.key=='Enter'){const b=d.querySelector('[data-p]');if(b)b.click()}};
+ document.body.appendChild(d);draw();d.showModal();d.oncancel=()=>{d.remove();r(null)}})}
+
+// ---------- เมนูสต็อก: เพิ่มปุ่มแก้ไข (แอดมิน) ----------
+function stockTbl(){const q=($('sq')?.value||'').toLowerCase(),r=STK.filter(x=>!q||x.name.toLowerCase().includes(q)||x.code.toLowerCase().includes(q));
+ $('stt').innerHTML='<tr><th>รหัส</th><th>ชื่อสินค้า</th><th>หมวด</th><th>หน่วย</th><th class="n">น้ำหนักรับเข้า</th><th class="n">ต้นทุนเฉลี่ย ฿/กก.</th><th class="n">ราคาตั้ง ฿/กก.</th><th class="n">มูลค่า (฿)</th>'+(adm?'<th></th>':'')+'</tr>'+
+ r.map(x=>`<tr><td>${esc(x.code)}</td><td style="background:${esc(pcol(x))};color:#2b2b2b;font-weight:600">${esc(x.name)}</td><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${catColor(x.cat)};margin-right:4px"></span>${esc(x.cat)}</td><td>กก.</td><td class="n">${f2(x.kg)}</td><td class="n">${f2(x.avg)}</td><td class="n">${f2(x.price)}</td><td class="n">${f2(x.val)}</td>${adm?`<td><button class="ic ed" aria-label="แก้ไข" onclick="editProd('${x.id}')">✏️</button></td>`:''}</tr>`).join('')+
+ `<tr><th colspan="4">รวม</th><th class="n">${f2(r.reduce((a,x)=>a+x.kg,0))}</th><th></th><th></th><th class="n">${f2(r.reduce((a,x)=>a+x.val,0))}</th>${adm?'<th></th>':''}</tr>`}
+
+// ---------- หน้าต่างแก้ไขสินค้า (ใช้ทั้งสต็อกและสินค้า/ราคา) ----------
+function editProd(id){const p=P.find(x=>x.id==id);if(!p)return toast('ไม่พบสินค้า');const cats=[...new Set(P.map(x=>x.cat))],d=document.createElement('dialog');
+ d.style.cssText='max-width:440px;width:94%;border-radius:12px;background:var(--c);color:var(--t)';
+ d.innerHTML=`<b style="font-size:18px">✏️ แก้ไขสินค้า</b><datalist id="mkcats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+ <div class="g" style="grid-template-columns:1fr 1fr;margin-top:8px"><div><label>รหัส</label><input id="ep1" value="${esc(p.code)}"></div><div><label>ชื่อ</label><input id="ep2" value="${esc(p.name)}"></div>
+ <div><label>หมวดหมู่ (พิมพ์ชื่อใหม่ได้)</label><input id="ep3" list="mkcats" value="${esc(p.cat)}"></div><div><label>ราคา/กก.</label><input id="ep5" type="number" step="0.01" value="${p.price}"></div></div>
+ <label style="margin-top:8px">สี</label><div class="row" style="align-items:center"><input id="ep4" type="color" value="${mkHex(pcol(p))}" style="flex:0 0 80px;height:44px;padding:2px"><button class="au">ใช้สีตามหมวด</button></div>
+ <div class="row" style="margin-top:12px"><button class="c">ยกเลิก</button><button class="pri s">💾 บันทึก</button></div>`;
+ document.body.appendChild(d);d.showModal();const g=i=>d.querySelector('#'+i);
+ d.querySelector('.c').onclick=()=>d.remove();d.oncancel=()=>d.remove();d.querySelector('.au').onclick=()=>{g('ep4').value=mkHex(catColor(g('ep3').value.trim()||p.cat))};
+ d.querySelector('.s').onclick=async()=>{const code=g('ep1').value.trim(),name=g('ep2').value.trim(),cat=g('ep3').value.trim()||'อื่นๆ',price=+g('ep5').value;
+  if(!code||!name)return toast('กรอกรหัสและชื่อให้ครบ');if(!(price>=0))return toast('ราคาไม่ถูกต้อง');
+  const{error}=await sb.from('products').update({code,name,category:cat,color:g('ep4').value,price_per_kg:price}).eq('id',id);if(error)return toast('แก้ไขไม่สำเร็จ: '+error.message,7000);
+  d.remove();await loadAll();if($('stock').classList.contains('on'))rStock();if($('prod').classList.contains('on'))rProd();toast('แก้ไขสินค้าแล้ว')}}
+
+// ---------- เมนูสินค้า/ราคา: แก้ได้ทุกช่อง + สีตามหมวด ----------
+let MKCATS=[];
+function rProd(){const cats=MKCATS=[...new Set(P.map(p=>p.cat))];
+ $('prod').innerHTML=`<datalist id="mkcats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+ <div class="card"><b>เพิ่มสินค้า</b><div class="row"><div><label>รหัส</label><input id="nc"></div><div><label>ชื่อ</label><input id="nn"></div><div><label>หมวด</label><input id="nk" list="mkcats" placeholder="โลหะ"></div><div><label>สี</label><input id="nl" type="color" value="#e9ecef"></div><div><label>ราคา/กก.</label><input id="np" type="number" step="0.01"></div><button class="pri" onclick="addProd()">เพิ่ม</button></div><div class="m" style="margin-top:4px">ถ้าไม่เลือกสี (เทาอ่อน) ระบบจะใช้สีประจำหมวดให้อัตโนมัติ</div></div>
+ <div class="card"><b>🎨 สีตามหมวดหมู่</b><div class="m" style="margin-bottom:6px">เลือกสีแล้วกด "ใช้กับทุกสินค้าในหมวด" เพื่อบันทึกลงสินค้าทั้งหมวด</div>
+ ${cats.map((c,i)=>`<div class="row2" style="align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px dashed var(--b)"><span style="flex:1;min-width:140px"><span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:${catShown(c)};vertical-align:middle"></span> <b>${esc(c)}</b> <span class="m">(${P.filter(p=>p.cat==c).length} รายการ)</span></span><input id="cc${i}" type="color" value="${catShown(c)}" style="width:60px;height:38px;padding:2px"><button onclick="catApply(${i})">ใช้กับทุกสินค้าในหมวด</button></div>`).join('')}
+ <button class="pri" style="margin-top:8px" onclick="autoColorAll()">🎨 ใส่สีให้สินค้าที่ยังไม่มีสี ตามหมวดอัตโนมัติ</button></div>
+ <div class="card" style="overflow-x:auto"><table><tr><th>รหัส</th><th>ชื่อ</th><th>หมวด</th><th>สี</th><th class="n">฿/กก.</th><th class="n">฿/กรัม</th><th></th></tr>${P.map(p=>`<tr>
+ <td><input value="${esc(p.code)}" style="width:80px" onchange="setProdF('${p.id}','code',this.value)"></td>
+ <td><input value="${esc(p.name)}" style="min-width:140px" onchange="setProdF('${p.id}','name',this.value)"></td>
+ <td><input list="mkcats" value="${esc(p.cat)}" style="min-width:110px" onchange="setProdF('${p.id}','category',this.value)"></td>
+ <td><input type="color" value="${mkHex(pcol(p))}" style="width:56px;height:38px;padding:2px" onchange="setProdF('${p.id}','color',this.value)"></td>
+ <td class="n"><input type="number" step="0.01" value="${p.price}" style="width:90px" onchange="setProdF('${p.id}','price_per_kg',this.value)"></td><td class="n">${(p.price/1000).toFixed(3)}</td><td style="white-space:nowrap"><button onclick="delProd('${p.id}')">ลบ</button></td></tr>`).join('')}</table></div>`}
+async function setProdF(id,f,v){v=String(v).trim();const o={};
+ if(f=='price_per_kg'){if(!(+v>=0))return toast('ราคาไม่ถูกต้อง');o[f]=+v}
+ else if(f=='category'){o[f]=v||'อื่นๆ'}
+ else if(f=='code'||f=='name'){if(!v)return toast('ห้ามเว้นว่าง');o[f]=v}
+ else o[f]=v;
+ const{error}=await sb.from('products').update(o).eq('id',id);if(error)return toast('แก้ไขไม่สำเร็จ: '+error.message,7000);
+ await loadAll();if(f=='category'||f=='price_per_kg')rProd();toast('แก้ไขแล้ว')}
+async function catApply(i){const c=MKCATS[i],col=$('cc'+i).value;
+ if(!await dlg('ตั้งสีของหมวด "'+c+'" ให้สินค้าทุกรายการในหมวดนี้?',{ok:'ตั้งสี'}))return;
+ const{error}=await sb.from('products').update({color:col}).eq('category',c);if(error)return toast(error.message,7000);await loadAll();rProd();toast('ตั้งสีหมวด "'+c+'" แล้ว')}
+async function autoColorAll(){if(!await dlg('ใส่สีตามหมวดให้สินค้าที่ยังไม่ได้เลือกสีทั้งหมด? (สินค้าที่มีสีอยู่แล้วจะไม่ถูกแตะ)',{ok:'ใส่สี'}))return;
+ for(const c of [...new Set(P.map(p=>p.cat))]){const{error}=await sb.from('products').update({color:catColor(c)}).eq('category',c).or('color.is.null,color.eq.#e9ecef');if(error)return toast(error.message,7000)}
+ await loadAll();rProd();toast('ใส่สีตามหมวดแล้ว')}
+</script>
+
+<script>
+// ===== r11 add-on (v2): ตัวดูรูปอยู่หน้าสุด และกดปิดได้ แม้เปิดทับหน้าต่างบิล =====
+(function(){
+ const box=document.getElementById('mk-img-viewer');
+ if(!box||box.dataset.top)return;box.dataset.top='1';
+
+ // ตัวดูรูปต้องอยู่ในลำดับ stacking ของ dialog ที่เปิดอยู่ จึงใช้ position:fixed ภายใน dialog
+ const css=document.createElement('style');
+ css.textContent='dialog #mk-img-viewer{position:fixed;inset:0;z-index:2147483647}';
+ document.head.appendChild(css);
+
+ function sync(){
+  const show=box.classList.contains('show');
+  if(show){
+   // ย้ายเข้า dialog ที่เปิดอยู่ (ตัวบนสุด) เพื่อให้กดได้
+   const ds=document.querySelectorAll('dialog[open]');
+   const host=ds.length?ds[ds.length-1]:document.body;
+   if(box.parentNode!==host)host.appendChild(box);
+  }else{
+   // ปิดแล้วย้ายกลับ body
+   if(box.parentNode!==document.body)document.body.appendChild(box);
+  }
+ }
+ new MutationObserver(sync).observe(box,{attributes:true,attributeFilter:['class']});
+
+ // กัน Esc ปิดหน้าต่างบิลไปพร้อมกับรูป: ถ้ารูปเปิดอยู่ ให้ปิดเฉพาะรูป
+ document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&box.classList.contains('show')){
+   e.preventDefault();e.stopImmediatePropagation();
+   box.querySelector('.mkiv-close').click();
+  }
+ },true);
+ document.addEventListener('cancel',e=>{
+  if(box.classList.contains('show'))e.preventDefault();
+ },true);
+})();
+</script>
+
+<script>  
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
