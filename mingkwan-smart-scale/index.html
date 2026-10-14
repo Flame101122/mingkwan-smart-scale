@@ -886,59 +886,33 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 </script>
 
 <script>
-// ===== r12 add-on: ใบรับซื้อชัด + หน่วย + คำอ่านไทย (ตัวบาง ชิดขวา ใต้ตัวเลข) + โลโก้ KHW =====
-// วางไว้ "ก่อน" <script> ของ serviceWorker (ท้ายไฟล์) ไม่ต้องแก้โค้ดเดิม
+// ===== r12 add-on: ใบรับแบบเดิมทุกอย่าง แต่ทำ "จุดทศนิยม" ให้เห็นชัด =====
+// เขียนทับเฉพาะ rcHtml / rcCanvas (ตัวเลขหน้าตาเหมือนเดิม ขนาดกระดาษเท่าเดิม) วางก่อน <script> ของ serviceWorker
 (function(){
- const D=['ศูนย์','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'],U=['','สิบ','ร้อย','พัน','หมื่น','แสน'];
- function th6(n){const d=String(n).split('').reverse();let s='';
-  for(let i=d.length-1;i>=0;i--){const x=+d[i];if(!x)continue;
-   if(i==0)s+=(x==1&&d.length>1)?'เอ็ด':D[x];
-   else if(i==1)s+=x==1?'สิบ':x==2?'ยี่สิบ':D[x]+'สิบ';
-   else s+=D[x]+U[i]}
-  return s}
- function thInt(n){n=Math.floor(n);if(n==0)return D[0];if(n>=1e6){const h=Math.floor(n/1e6),l=n%1e6;return thInt(h)+'ล้าน'+(l?th6(l):'')}return th6(n)}
- // 1 -> "หนึ่งกิโล" , 1.1 -> "หนึ่งจุดหนึ่งกิโล" , 12.25 -> "สิบสองจุดสองห้ากิโล"
- window.thKg=function(x){x=r2(Math.abs(+x||0));const p=x.toFixed(2).split('.'),f=p[1].replace(/0+$/,'');
-  return thInt(+p[0])+(f?'จุด'+[...f].map(c=>D[+c]).join(''):'')+'กิโล'};
+ const DOT=/(\d)\.(\d)/g;
+ // ---- พิมพ์ผ่านเบราว์เซอร์: ครอบจุดทศนิยมให้ใหญ่และหนา ----
+ const dec=s=>String(s).replace(DOT,'$1<span class="dp">.</span>$2');
+ window.rcHtml=function(rc){const w=PR.w==58?46:70,rows=rcRows(rc).map(r=>{if(r.k=='hr')return '<hr>';if(r.k=='sp')return '<div style="height:10px"></div>';const st=(r.bold?'font-weight:700;':'')+(r.big?'font-size:15px;':'')+(r.small?'font-size:10.5px;':'');
+  if(r.k=='c')return `<div style="text-align:center;${st}">${dec(esc(r.a))}</div>`;if(r.k=='lr')return `<div style="display:flex;justify-content:space-between;gap:6px;${st}"><span>${dec(esc(r.a))}</span><span style="white-space:nowrap">${dec(esc(r.b))}</span></div>`;return `<div style="${st}">${dec(esc(r.a))}</div>`}).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700;900&display=swap" rel="stylesheet"><style>@page{size:${PR.w}mm auto;margin:0}html,body{margin:0}body{padding:2mm 3mm;width:${w}mm;font:12px/1.4 Prompt,sans-serif;color:#000}hr{border:0;border-top:1px dashed #000;margin:4px 0}.dp{font-weight:900;font-size:1.6em;line-height:0;padding:0 .06em;-webkit-text-stroke:.4px #000}</style></head><body>${rows}</body></html>`};
 
- // k:'c' กลาง | 'l' ซ้าย | 'lr' ซ้าย-ขวา | 'rt' ข้อความชิดขวา (คำอ่านไทย ตัวบาง) | 'logo'
- // bold = เฉพาะหัวรายการ/หัวข้อ และตัวเลข ; ข้อความอื่นตัวปกติ
- window.rcRows=function(rc){const R=[],t=new Date(rc.ts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'});
-  R.push({k:'logo'},{k:'c',a:rc.shop,bold:1,big:1},{k:'c',a:rc.title},{k:'l',a:'เลขที่ '+rc.no,bold:1},{k:'l',a:'วันที่ '+t},{k:'l',a:'ผู้ขาย: '+rc.seller},{k:'l',a:'ผู้ชั่ง: '+rc.weigher+' ('+rc.scale+')'});
-  if(rc.note)R.push({k:'l',a:rc.note});R.push({k:'hr'});
-  rc.lines.forEach((l,i)=>{R.push({k:'l',a:(i+1)+'. '+l.name,bold:1,big:1});
-   if(l.pending){R.push({k:'lr',a:'รถหนัก',b:f2(l.heavy)+' กก.',bold:1,bb:1},{k:'rt',a:'(รอชั่งรถเบา)'});R.push({k:'hr'});return}
-   const gross=+l.gross||0,tare=+l.tare||0,pct=+l.pct||0,imp=pct?r2(Math.max(0,gross-tare)*pct/100):0,net=+l.net||0;
-   if(l.truck){R.push({k:'lr',a:'รถหนัก',b:f2(l.heavy)+' กก.',bold:1,bb:1},{k:'lr',a:'รถเบา',b:f2(l.light)+' กก.',bold:1,bb:1})}
-   R.push({k:'lr',a:'รวมทั้งหมด',b:f2(gross)+' กก.',bold:1,bb:1},{k:'rt',a:thKg(gross)});
-   R.push({k:'lr',a:'หัก'+(l.truck?'':'ภาชนะ'),b:f2(tare)+' กก.',bold:1,bb:1},{k:'rt',a:tare>0?'หัก '+thKg(tare):'ไม่มีการหัก'});
-   if(imp>0)R.push({k:'lr',a:'หักเจือปน '+pct+'%',b:f2(imp)+' กก.',bold:1,bb:1},{k:'rt',a:'หัก '+thKg(imp)});
-   R.push({k:'lr',a:'รวมหักแล้ว (สุทธิ)',b:f2(net)+' กก.',bold:1,bb:1,big:1},{k:'rt',a:thKg(net)});
-   R.push({k:'lr',a:'ราคา',b:f2(l.price)+' บาท/กก.',bold:1,bb:1},{k:'lr',a:'เป็นเงิน',b:f2(l.amount)+' บาท',bold:1,bb:1,big:1});R.push({k:'hr'})});
-  R.push({k:'lr',a:'รวมสุทธิ',b:f2(rc.total)+' บาท',bold:1,bb:1,big:1},{k:'sp'},{k:'l',a:'ลงชื่อผู้ขาย ______________'},{k:'sp'},{k:'c',a:'ขอบคุณที่ใช้บริการ'});return R};
-
- // พิมพ์ผ่านเบราว์เซอร์
- window.rcHtml=function(rc){const w=PR.w==58?46:70,rows=rcRows(rc).map(r=>{if(r.k=='hr')return '<hr>';if(r.k=='sp')return '<div style="height:12px"></div>';
-   if(r.k=='logo')return '<div style="text-align:center;margin:0 0 4px"><span style="display:inline-block;background:#000;color:#fff;border-radius:8px;padding:2px 16px;font:900 24px/1.25 Prompt,sans-serif;letter-spacing:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact">KHW</span></div>';
-   const st='font-weight:'+(r.bold?800:500)+';'+(r.big?'font-size:18px;':'font-size:14px;');
-   if(r.k=='c')return `<div style="text-align:center;${st}">${esc(r.a)}</div>`;
-   if(r.k=='rt')return `<div style="text-align:right;margin-top:-2px;${st}">${esc(r.a)}</div>`;
-   if(r.k=='lr')return `<div style="display:flex;justify-content:space-between;gap:6px;${st}"><span>${esc(r.a)}</span><span style="white-space:nowrap">${esc(r.b)}</span></div>`;
-   return `<div style="${st}">${esc(r.a)}</div>`}).join('');
-  return `<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;800;900&display=swap" rel="stylesheet"><style>@page{size:${PR.w}mm auto;margin:0}html,body{margin:0}body{padding:2mm 3mm;width:${w}mm;font:500 14px/1.45 Prompt,sans-serif;color:#000;-webkit-font-smoothing:none}hr{border:0;border-top:2px dashed #000;margin:5px 0}</style></head><body>${rows}</body></html>`};
-
- // พิมพ์ ESC/POS (ส่งเป็นภาพ)
- window.rcCanvas=async function(rc){const W=PR.w==58?384:576,fs=PR.w==58?25:30,pad=6;
-  try{await document.fonts.load('900 '+fs+'px Prompt');await document.fonts.load('800 '+fs+'px Prompt');await document.fonts.load('500 '+fs+'px Prompt')}catch(e){}
-  const m=document.createElement('canvas').getContext('2d'),sz=r=>Math.round(fs*(r.big?1.25:1)),fnt=r=>(r.bold?'800 ':'500 ')+sz(r)+'px Prompt,sans-serif',out=[];
-  for(const r of rcRows(rc)){
-   if(r.k=='hr'){out.push({h:14,d:(c,y)=>c.fillRect(pad,y+5,W-2*pad,3)});continue}
-   if(r.k=='sp'){out.push({h:Math.round(fs*.8),d:()=>{}});continue}
-   if(r.k=='logo'){const bh=Math.round(fs*1.7),bw=Math.round(fs*4.6);out.push({h:bh+8,d:(c,y)=>{const x=(W-bw)/2;c.fillStyle='#000';c.beginPath();if(c.roundRect)c.roundRect(x,y,bw,bh,12);else c.rect(x,y,bw,bh);c.fill();c.fillStyle='#fff';c.font='900 '+Math.round(fs*1.25)+'px Prompt,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('KHW',W/2,y+bh/2+2);c.fillStyle='#000'}});continue}
-   m.font=fnt(r);const lh=Math.round(sz(r)*1.4);
-   if(r.k=='lr'){const bw=m.measureText(r.b).width;out.push({h:lh,d:(c,y)=>{c.font=fnt(r);c.textBaseline='top';c.textAlign='left';let a=r.a;while(a&&c.measureText(a).width>W-2*pad-bw-10)a=a.slice(0,-1);c.fillText(a,pad,y);c.textAlign='right';c.fillText(r.b,W-pad,y)}});continue}
-   if(r.k=='rt'){out.push({h:Math.round(lh*.9),d:(c,y)=>{c.font=fnt(r);c.textBaseline='top';c.textAlign='right';let a=r.a;while(a&&c.measureText(a).width>W-2*pad)a=a.slice(0,-1);c.fillText(a,W-pad,y)}});continue}
-   for(const t of wrapT(m,r.a,W-2*pad))out.push({h:lh,d:(c,y)=>{c.font=fnt(r);c.textBaseline='top';c.textAlign=r.k=='c'?'center':'left';c.fillText(t,r.k=='c'?W/2:pad,y)}})}
+ // ---- พิมพ์ ESC/POS (ภาพ): วาดจุดทศนิยมเป็นวงกลมทึบ ----
+ // กว้างของข้อความ (จุดทศนิยมกินที่ fs*0.34 ตายตัว)
+ const dw=(c,fsz)=>Math.round(fsz*.34);
+ function tw(c,t,fsz){let w=0,last=0,m;DOT.lastIndex=0;const re=/(\d)\.(\d)/g;
+  while((m=re.exec(t))){const i=m.index+1;w+=c.measureText(t.slice(last,i)).width+dw(c,fsz);last=i+1;re.lastIndex=i+1}
+  return w+c.measureText(t.slice(last)).width}
+ function dt(c,t,x,y,align,fsz){const W=tw(c,t,fsz);let cx=align=='right'?x-W:align=='center'?x-W/2:x;const re=/(\d)\.(\d)/g;let last=0,m;c.textAlign='left';
+  const dp=c.measureText('0').actualBoundingBoxDescent||fsz*.8,r=Math.max(2,Math.round(fsz*.13));
+  while((m=re.exec(t))){const i=m.index+1,seg=t.slice(last,i);c.fillText(seg,cx,y);cx+=c.measureText(seg).width;
+   c.beginPath();c.arc(cx+dw(c,fsz)/2,y+dp-r-1,r,0,7);c.fill();cx+=dw(c,fsz);last=i+1;re.lastIndex=i+1}
+  c.fillText(t.slice(last),cx,y)}
+ window.rcCanvas=async function(rc){const W=PR.w==58?384:576,fs=PR.w==58?21:25,pad=6;try{await document.fonts.load('700 '+fs+'px Prompt');await document.fonts.load('400 '+fs+'px Prompt')}catch(e){}
+  const m=document.createElement('canvas').getContext('2d'),sz=r=>Math.round(fs*(r.big?1.25:r.small?.82:1)),fnt=r=>(r.bold?'700 ':'400 ')+sz(r)+'px Prompt,sans-serif',out=[];
+  for(const r of rcRows(rc)){if(r.k=='hr'){out.push({h:12,d:(c,y)=>c.fillRect(pad,y+5,W-2*pad,2)});continue}if(r.k=='sp'){out.push({h:Math.round(fs*.7),d:()=>{}});continue}
+   m.font=fnt(r);const lh=Math.round(sz(r)*1.4),f=sz(r),px={measureText:s=>({width:tw(m,s,f)})};
+   if(r.k=='lr'){const bw=tw(m,r.b,f);out.push({h:lh,d:(c,y)=>{c.font=fnt(r);c.textBaseline='top';let a=r.a;while(a&&tw(c,a,f)>W-2*pad-bw-10)a=a.slice(0,-1);dt(c,a,pad,y,'left',f);dt(c,r.b,W-pad,y,'right',f)}});continue}
+   for(const t of wrapT(px,r.a,W-2*pad))out.push({h:lh,d:(c,y)=>{c.font=fnt(r);c.textBaseline='top';dt(c,t,r.k=='c'?W/2:pad,y,r.k=='c'?'center':'left',f)}})}
   const H=out.reduce((a,x)=>a+x.h,0)+24,cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W,H);c.fillStyle='#000';let y=8;for(const x of out){x.d(c,y);y+=x.h}return cv};
 })();
 </script>
