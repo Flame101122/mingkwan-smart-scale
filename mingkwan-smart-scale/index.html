@@ -143,7 +143,7 @@ function dlg(title,{input=false,ok='ตกลง',danger=false,no='ยกเล�
  d.innerHTML=`<b>${esc(title)}</b>${body}${input?`<textarea id="di" rows="3" style="margin-top:8px" placeholder="${esc(ph)}">${esc(init)}</textarea>`:''}<div class="row" style="margin-top:10px"><button id="dn">${no}</button><button id="dk" class="${danger?'dan':'pri'}">${ok}</button></div>`;
  document.body.appendChild(d);d.showModal();const done=v=>{d.remove();r(v)};d.oncancel=()=>done(null);d.querySelector('#dn').onclick=()=>done(null);
  d.querySelector('#dk').onclick=()=>{const v=input?d.querySelector('#di').value.trim():true;if(input&&!v)return d.querySelector('#di').focus();done(v)}})}
-const BUILD='2026-10-14 r12';console.log('Mingkwan build',BUILD);
+const BUILD='2026-10-14 r13';console.log('Mingkwan build',BUILD);
 const sb=supabase.createClient('https://sunifccylaokivalwjic.supabase.co','sb_publishable_mNYJioB49fgTQZZzQq3zgg_QpA0fu2n',{global:{fetch:(u,o)=>fetch(u,{...o,cache:'no-store'})}});
 let ME=null,T=[],saving=false;const TABS={clerk:['weigh','truck','dash','mine'],cashier:['dash','admin','hist','stock','rep'],admin:['weigh','truck','dash','admin','hist','staff','audit','stock','rep','prod','set']},RL={clerk:'User — พนักงานชั่ง',cashier:'ผู้จ่ายเงิน/บัญชี',admin:'Admin'},can=t=>TABS[ME?.role]?.includes(t),FRONT=['weigh','truck','dash','mine'],TC={weigh:'#22c55e',truck:'#0ea5e9',dash:'#818cf8',mine:'#2dd4bf',admin:'#f59e0b',hist:'#a78bfa',audit:'#f472b6',stock:'#fb923c',rep:'#60a5fa',prod:'#a3e635',set:'#94a3b8',staff:'#e879f9'};
 let S={shop:'Mingkwan Smart Scale',recorder:'พนักงาน 1',pin:'1234',tares:'ตะกร้าเล็ก:1.2,ตะกร้าใหญ่:2.5,กระสอบ:0.3',unit:'kg'};
@@ -914,6 +914,157 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
    if(r.k=='lr'){const bw=tw(m,r.b,f);out.push({h:lh,d:(c,y)=>{c.font=fnt(r);c.textBaseline='top';let a=r.a;while(a&&tw(c,a,f)>W-2*pad-bw-10)a=a.slice(0,-1);dt(c,a,pad,y,'left',f);dt(c,r.b,W-pad,y,'right',f)}});continue}
    for(const t of wrapT(px,r.a,W-2*pad))out.push({h:lh,d:(c,y)=>{c.font=fnt(r);c.textBaseline='top';dt(c,t,r.k=='c'?W/2:pad,y,r.k=='c'?'center':'left',f)}})}
   const H=out.reduce((a,x)=>a+x.h,0)+24,cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W,H);c.fillStyle='#000';let y=8;for(const x of out){x.d(c,y);y+=x.h}return cv};
+})();
+</script>
+
+<script>
+// ===== r13 add-on: แดชบอร์ดกราฟแนวโน้ม (เลือกช่วงอิสระ) + เมนู "ปิดวัน/สรุปยอด" =====
+// ไม่แก้โค้ดเดิม: ห่อ rDash เดิมแล้วต่อท้ายส่วนกราฟ / เพิ่มเมนูและ section ใหม่ / วางก่อน <script> ของ serviceWorker
+(function(){
+ if(window.__mk13)return;window.__mk13=1;
+ const Z=n=>String(n).padStart(2,'0'),YMD=d=>d.getFullYear()+'-'+Z(d.getMonth()+1)+'-'+Z(d.getDate()),
+  PD=s=>{const a=s.split('-').map(Number);return new Date(a[0],a[1]-1,a[2])},addD=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x},
+  DAYMS=864e5,TH_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'],TH_D=['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'],
+  thD=d=>d.getDate()+' '+TH_M[d.getMonth()]+' '+(d.getFullYear()+543),
+  thLong=d=>d.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),
+  today0=()=>{const t=new Date();t.setHours(0,0,0,0);return t},
+  kgOf=b=>(b.bill_items||[]).reduce((a,i)=>a+(+i.net_kg||0),0),
+  compact=v=>{const a=Math.abs(v);return a>=1e6?(v/1e6).toFixed(a%1e6?1:0)+'M':a>=1e3?(v/1e3).toFixed(a%1e3?1:0)+'k':String(Math.round(v*100)/100)},
+  money=v=>'฿'+f2(v),LOAD='<div class="m" style="padding:26px;text-align:center">⏳ กำลังโหลดข้อมูล...</div>';
+ function niceMax(max){if(!(max>0))return{step:1,top:4};const raw=max/4,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p,s=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;return{step:s,top:Math.ceil(max/s-1e-9)*s}}
+ // ---------- ดึงข้อมูลแบบแบ่งหน้า (ผ่าน RLS เดิม) ----------
+ async function pull(sel,build){const out=[];for(let off=0;off<30000;off+=500){const{data,error}=await build(sb.from('bills').select(sel)).order('created_at',{ascending:true}).order('id').range(off,off+499);if(error)throw error;out.push(...data);if(data.length<500)break}return out}
+ // ---------- กราฟแท่ง SVG (รองรับธีมมืด/สว่าง + tooltip) ----------
+ function drawChart(host,o){const W=Math.max(280,host.clientWidth||680),H=o.H||250,L=46,R=8,T=14,Bt=26,iw=W-L-R,ih=H-T-Bt,n=o.vals.length;
+  if(!n){host.innerHTML='<div class="m" style="padding:24px;text-align:center">ไม่มีข้อมูลในช่วงนี้</div>';return}
+  const mx=Math.max(0,...o.vals,...(o.ma||[]).filter(x=>x!=null)),nm=niceMax(mx),step=nm.step,top=nm.top,bw=iw/n,bwid=Math.max(1,Math.min(bw*.72,46)),Y=v=>T+ih-(top?v/top*ih:0);
+  let g='';for(let v=0,c=0;v<=top+1e-9&&c<12;v+=step,c++)g+=`<line class="gl" x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end">${compact(v)}</text>`;
+  const bars=o.vals.map((v,i)=>{const x=L+i*bw+(bw-bwid)/2,y=Y(v),h=Math.max(v>0?1.5:0,T+ih-y);return `<rect class="bar" x="${x.toFixed(1)}" y="${(T+ih-h).toFixed(1)}" width="${bwid.toFixed(1)}" height="${h.toFixed(1)}" rx="${bwid>7?3:0}"/>`}).join(''),
+  vl=(bw>=40&&n<=24)?o.vals.map((v,i)=>v>0?`<text class="vl" x="${(L+i*bw+bw/2).toFixed(1)}" y="${(Y(v)-4).toFixed(1)}" text-anchor="middle">${compact(v)}</text>`:'').join(''):'',
+  k=Math.max(1,Math.ceil(n/Math.max(2,Math.floor(iw/52)))),xl=o.labels.map((s,i)=>i%k==0?`<text x="${(L+i*bw+bw/2).toFixed(1)}" y="${H-8}" text-anchor="middle">${esc(s)}</text>`:'').join(''),
+  pts=(o.ma||[]).map((v,i)=>v==null?null:`${(L+i*bw+bw/2).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean),ln=pts.length>1?`<polyline class="ma" points="${pts.join(' ')}"/>`:'';
+  host.innerHTML=`<div style="position:relative"><svg class="mk-svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img" aria-label="${esc(o.aria||'กราฟ')}"><rect class="hv" x="0" y="${T}" width="0" height="${ih}"/>${g}${bars}${ln}${vl}${xl}</svg><div class="mk-tip"></div></div>`;
+  const svg=host.querySelector('svg'),tip=host.querySelector('.mk-tip'),hv=host.querySelector('.hv'),off=()=>{tip.style.display='none';hv.style.opacity=0},
+  mv=e=>{const r=svg.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,i=Math.floor((x-L)/bw);if(i<0||i>=n)return off();
+   hv.setAttribute('x',L+i*bw);hv.setAttribute('width',bw);hv.style.opacity=1;tip.innerHTML=o.tip(i);tip.style.display='block';
+   const px=(L+i*bw+bw/2)*r.width/W;tip.style.left=Math.max(0,Math.min(px-tip.offsetWidth/2,r.width-tip.offsetWidth))+'px'};
+  svg.addEventListener('pointermove',mv);svg.addEventListener('pointerdown',mv);svg.addEventListener('pointerleave',off)}
+ // =====================================================================
+ //  1) แดชบอร์ด: แนวโน้มรายวัน/สัปดาห์/เดือน เลือกช่วงได้อิสระ
+ // =====================================================================
+ const DT={p:'30',from:'',to:'',g:'auto',m:'amt',LAST:null,tok:0},TC_={};
+ const PRE=[['7','7 วัน'],['30','30 วัน'],['90','90 วัน'],['mth','เดือนนี้'],['lm','เดือนที่แล้ว'],['ytd','ปีนี้'],['365','12 เดือน']],MET={amt:['ยอดซื้อ ฿','฿'],kg:['น้ำหนัก กก.','กก.'],cnt:['จำนวนบิล','บิล']};
+ function applyPreset(p){const t=today0();let f=t,e=t;if(p=='7')f=addD(t,-6);else if(p=='30')f=addD(t,-29);else if(p=='90')f=addD(t,-89);else if(p=='365')f=addD(t,-364);else if(p=='mth')f=new Date(t.getFullYear(),t.getMonth(),1);else if(p=='lm'){f=new Date(t.getFullYear(),t.getMonth()-1,1);e=new Date(t.getFullYear(),t.getMonth(),0)}else if(p=='ytd')f=new Date(t.getFullYear(),0,1);DT.p=p;DT.from=YMD(f);DT.to=YMD(e)}
+ function bucketKey(d,g){if(g=='month')return d.getFullYear()+'-'+Z(d.getMonth()+1);if(g=='week'){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-(x.getDay()+6)%7);return YMD(x)}return YMD(d)}
+ function buckets(from,to,g){const out=[];let d=g=='month'?new Date(from.getFullYear(),from.getMonth(),1):g=='week'?PD(bucketKey(from,'week')):new Date(from);
+  while(d<=to&&out.length<2000){out.push(bucketKey(d,g));d=g=='month'?new Date(d.getFullYear(),d.getMonth()+1,1):addD(d,g=='week'?7:1)}return out}
+ function bLabel(k,g,full){if(g=='month'){const a=k.split('-').map(Number);return full?new Date(a[0],a[1]-1,1).toLocaleDateString('th-TH',{month:'long',year:'numeric'}):TH_M[a[1]-1]+' '+String((a[0]+543)%100).padStart(2,'0')}
+  const d=PD(k);if(g=='week'){const e=addD(d,6);return full?'สัปดาห์ '+thD(d)+' – '+thD(e):d.getDate()+'/'+(d.getMonth()+1)}return full?TH_D[d.getDay()]+' '+thD(d):d.getDate()+'/'+(d.getMonth()+1)}
+ const TCACHE={};
+ async function trendData(from,to){const n=Math.round((to-from)/DAYMS)+1,pf=addD(from,-n),key=YMD(pf)+'_'+YMD(to),c=TCACHE[key];if(c&&Date.now()-c.t<60000)return c.v;
+  const v=await pull('id,created_at,total,status,bill_items(product_name,net_kg,amount)',q=>q.in('status',['pending','approved']).gte('created_at',pf.toISOString()).lt('created_at',addD(to,1).toISOString()));TCACHE[key]={t:Date.now(),v};return v}
+ function trendShell(){const m=DT.m;return `<div class="card mk-tr"><div class="mk-h"><b style="font-size:18px">📈 แนวโน้มการรับซื้อ</b><span class="m" id="mkSub"></span></div>
+  <div class="mk-chips" id="mkPre">${PRE.map(([k,t])=>`<button class="chip${DT.p==k?' on':''}" data-p="${k}">${t}</button>`).join('')}</div>
+  <div class="row" style="align-items:end;margin-top:4px"><div><label>ตั้งแต่ (เลือกอิสระ)</label><input type="date" id="mkF" value="${DT.from}" max="${YMD(today0())}"></div><div><label>ถึง</label><input type="date" id="mkT" value="${DT.to}" max="${YMD(today0())}"></div>
+  <div><label>จัดกลุ่มเป็น</label><select id="mkG">${[['auto','อัตโนมัติ'],['day','รายวัน'],['week','รายสัปดาห์'],['month','รายเดือน']].map(([k,t])=>`<option value="${k}"${DT.g==k?' selected':''}>${t}</option>`).join('')}</select></div></div>
+  <div id="mkKpi" class="stats" style="margin-top:10px"></div>
+  <div class="mk-chips" id="mkMet">${Object.entries(MET).map(([k,v])=>`<button class="chip${m==k?' on':''}" data-m="${k}">${v[0]}</button>`).join('')}<span class="m" id="mkLg" style="align-self:center"></span></div>
+  <div id="mkChart">${LOAD}</div><div id="mkProd"></div><div id="mkTbl"></div></div>`}
+ function trendMount(){const host=$('dash');if(!host)return;if(!DT.from)applyPreset(DT.p);document.querySelectorAll('#mkTrend').forEach(x=>x.remove());const el=document.createElement('div');el.id='mkTrend';el.innerHTML=trendShell();host.appendChild(el);
+  el.addEventListener('click',e=>{const b=e.target.closest('[data-p],[data-m]');if(!b)return;if(b.dataset.p){applyPreset(b.dataset.p)}else DT.m=b.dataset.m;trendMount()});
+  const chg=()=>{const f=$('mkF').value,t=$('mkT').value;if(f&&t){DT.from=f<=t?f:t;DT.to=f<=t?t:f;DT.p='custom'}DT.g=$('mkG').value;trendMount()};
+  ['mkF','mkT','mkG'].forEach(i=>$(i).addEventListener('change',chg));trendLoad()}
+ async function trendLoad(){const tok=++DT.tok,from=PD(DT.from),to=PD(DT.to),days=Math.round((to-from)/DAYMS)+1,key=DT.from+'_'+DT.to;
+  if(days>800){$('mkChart').innerHTML='<div class="m" style="padding:20px">เลือกช่วงได้ไม่เกิน 800 วัน</div>';return}
+  if(DT.LAST&&DT.LAST.key==key)trendPaint(DT.LAST.rows);
+  try{const rows=await trendData(from,to);if(tok!=DT.tok||!$('mkChart'))return;DT.LAST={key,rows};trendPaint(rows)}catch(e){if($('mkChart'))$('mkChart').innerHTML='<div class="m" style="padding:20px;color:var(--d)">โหลดข้อมูลไม่ได้: '+esc(e.message||e)+'</div>'}}
+ function dlt(c,p){if(!(p>0))return '<small class="m">ช่วงก่อนหน้าไม่มีข้อมูล</small>';const d=(c-p)/p*100;return `<small style="color:${d>=0?'#16a34a':'#dc2626'};font-weight:700">${d>=0?'▲':'▼'} ${Math.abs(d).toFixed(1)}%</small> <small class="m">เทียบช่วงก่อนหน้า</small>`}
+ function trendPaint(rows){if(!$('mkChart'))return;const from=PD(DT.from),to=PD(DT.to),days=Math.round((to-from)/DAYMS)+1,pf=addD(from,-days),end=addD(to,1),
+  g=DT.g=='auto'?(days<=62?'day':days<=200?'week':'month'):DT.g,bk=buckets(from,to,g),M={},DAY={},prod={},tot={amt:0,kg:0,cnt:0},pv={amt:0,kg:0,cnt:0};
+  bk.forEach(k=>M[k]={amt:0,kg:0,cnt:0});
+  for(const b of rows){const d=new Date(b.created_at),kg=kgOf(b),amt=+b.total||0;
+   if(d>=from&&d<end){const m=M[bucketKey(d,g)];if(!m)continue;m.amt+=amt;m.kg+=kg;m.cnt++;tot.amt+=amt;tot.kg+=kg;tot.cnt++;const dk=YMD(d);DAY[dk]=(DAY[dk]||0)+amt;
+    for(const i of b.bill_items||[]){const p=prod[i.product_name]=prod[i.product_name]||{kg:0,amt:0};p.kg+=+i.net_kg||0;p.amt+=+i.amount||0}}
+   else if(d>=pf&&d<from){pv.amt+=amt;pv.kg+=kg;pv.cnt++}}
+  const gn={day:'รายวัน',week:'รายสัปดาห์',month:'รายเดือน'}[g];$('mkSub').textContent=thD(from)+' – '+thD(to)+' · '+days+' วัน · '+gn;
+  const best=Object.entries(DAY).sort((a,b)=>b[1]-a[1])[0],S_=(t,v,sub,c)=>`<div class="stat" style="border-top:4px solid ${c}"><span class="m">${t}</span><b>${v}</b>${sub||''}</div>`;
+  $('mkKpi').innerHTML=S_('ยอดซื้อรวม',money(tot.amt),dlt(tot.amt,pv.amt),'#16a34a')+S_('น้ำหนักสุทธิรวม (กก.)',f2(tot.kg),dlt(tot.kg,pv.kg),'#2563eb')+S_('จำนวนบิล',tot.cnt.toLocaleString('th-TH'),dlt(tot.cnt,pv.cnt),'#8b5cf6')+
+   S_('เฉลี่ยต่อวัน',money(tot.amt/days),'<small class="m">'+f2(tot.kg/days)+' กก./วัน</small>','#f59e0b')+S_('ราคาเฉลี่ย (฿/กก.)',tot.kg?f2(tot.amt/tot.kg):'-','<small class="m">ถัวเฉลี่ยถ่วงน้ำหนัก</small>','#14b8a6')+
+   S_('วันยอดซื้อสูงสุด',best?money(best[1]):'-','<small class="m">'+(best?thD(PD(best[0])):'—')+'</small>','#ec4899');
+  const vals=bk.map(k=>M[k][DT.m]),w=g=='day'?7:g=='week'?4:3,ma=vals.length>=5?vals.map((_,i)=>{const s=vals.slice(Math.max(0,i-w+1),i+1);return s.reduce((a,b)=>a+b,0)/s.length}):null,
+  fv=v=>DT.m=='amt'?money(v):DT.m=='kg'?f2(v)+' กก.':v.toLocaleString('th-TH')+' บิล';
+  $('mkLg').innerHTML=ma?'<span style="display:inline-block;width:18px;height:3px;background:#f59e0b;vertical-align:middle;border-radius:2px"></span> ค่าเฉลี่ยเคลื่อนที่ '+w+' '+(g=='day'?'วัน':g=='week'?'สัปดาห์':'เดือน'):'';
+  drawChart($('mkChart'),{labels:bk.map(k=>bLabel(k,g,false)),vals,ma,aria:'กราฟแนวโน้ม '+MET[DT.m][0],tip:i=>{const m=M[bk[i]];return `<b>${esc(bLabel(bk[i],g,true))}</b><br>ยอดซื้อ ${money(m.amt)}<br>น้ำหนัก ${f2(m.kg)} กก.<br>${m.cnt} บิล`+(m.kg?`<br>เฉลี่ย ฿${f2(m.amt/m.kg)}/กก.`:'')}});
+  const top=Object.entries(prod).sort((a,b)=>b[1].amt-a[1].amt).slice(0,10),mxp=top[0]?top[0][1].amt:1;
+  $('mkProd').innerHTML=`<div style="margin-top:14px"><b>🏷 สินค้าที่รับซื้อมากที่สุดในช่วงนี้</b>${top.map(([n,v])=>`<div class="bar"><span>${esc(n)}<br><span class="m">${f2(v.kg)} กก. · ${tot.amt?(v.amt/tot.amt*100).toFixed(1):0}% · ฿${v.kg?f2(v.amt/v.kg):'-'}/กก.</span></span><div><i style="width:${v.amt/mxp*100}%"></i></div><b>${money(v.amt)}</b></div>`).join('')||'<div class="m" style="padding:10px 0">ไม่มีรายการ</div>'}</div>`;
+  const tr=[...bk].reverse().map(k=>{const m=M[k];return `<tr><td>${esc(bLabel(k,g,true))}</td><td class="n">${m.cnt}</td><td class="n">${f2(m.kg)}</td><td class="n">${f2(m.amt)}</td></tr>`}).join('');
+  $('mkTbl').innerHTML=`<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">📋 ตารางรายละเอียด (${bk.length} แถว)</summary><div style="overflow-x:auto;max-height:360px;overflow-y:auto"><table><tr><th>ช่วง</th><th class="n">บิล</th><th class="n">น้ำหนัก (กก.)</th><th class="n">ยอดซื้อ (฿)</th></tr>${tr}</table></div><button class="bt-blue" style="margin-top:6px" id="mkCsv">⬇ CSV</button></details>`;
+  $('mkCsv').onclick=()=>{const R=[['ช่วง','จำนวนบิล','น้ำหนักสุทธิ(กก.)','ยอดซื้อ(บาท)']];bk.forEach(k=>R.push([bLabel(k,g,true),M[k].cnt,r2(M[k].kg),r2(M[k].amt)]));dl('trend_'+DT.from+'_'+DT.to+'.csv','﻿'+R.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n'),'text/csv')}}
+ const rDash0=window.rDash;window.rDash=function(){rDash0.apply(this,arguments);try{trendMount()}catch(e){console.warn('trend',e)}};
+ let rz=0;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if($('dash')?.classList.contains('on')&&DT.LAST)trendPaint(DT.LAST.rows);if($('close')?.classList.contains('on')&&CS.view)CS.view()},250)});
+
+ // =====================================================================
+ //  2) เมนู "ปิดวัน/สรุปยอด" (ก่อนปุ่มเปลี่ยนรหัสผ่าน) — ดูวันนี้ / ย้อนหลัง
+ // =====================================================================
+ const CS={d:YMD(today0()),tok:0,key:'',view:null};
+ const nav=$('nav'),main=document.querySelector('main');
+ if(nav&&main&&!document.querySelector('nav [data-t="close"]')){
+  nav.insertAdjacentHTML('beforeend','<button data-t="close">🔒 ปิดวัน/สรุปยอด</button>');main.insertAdjacentHTML('beforeend','<section id="close"></section>');
+  for(const r of['cashier','admin'])if(!TABS[r].includes('close'))TABS[r].push('close');TC.close='#14b8a6';
+  if(typeof ME!=='undefined'&&ME)document.querySelectorAll('nav button').forEach(b=>{if(!can(b.dataset.t))b.style.display='none'});
+  nav.addEventListener('click',e=>{if(e.target.closest('button')?.dataset.t=='close'&&can('close'))rClose()})}
+ window.rClose=function(){const el=$('close');if(!el)return;const t=YMD(today0());
+  el.innerHTML=`<div class="mk-hero"><div><div class="mk-hs">🔒 ปิดวัน / สรุปยอด</div><div class="mk-hd" id="mkCd"></div><span class="mk-pill" id="mkCp"></span></div>
+  <div class="mk-hn"><button data-a="prev" aria-label="วันก่อนหน้า">◀</button><input type="date" id="mkCi" value="${CS.d}" max="${t}"><button data-a="next" aria-label="วันถัดไป">▶</button><button data-a="today">วันนี้</button><button data-a="yest">เมื่อวาน</button></div></div><div id="mkCb">${LOAD}</div>`;
+  const go=d=>{const x=YMD(d);CS.d=x>t?t:x;rClose()};
+  el.querySelector('.mk-hn').addEventListener('click',e=>{const a=e.target.closest('button')?.dataset.a;if(!a)return;const c=PD(CS.d);go(a=='prev'?addD(c,-1):a=='next'?addD(c,1):a=='today'?today0():addD(today0(),-1))});
+  $('mkCi').addEventListener('change',e=>{if(e.target.value)go(PD(e.target.value))});closeLoad()};
+ async function closeLoad(){const tok=++CS.tok,f=PD(CS.d),t=addD(f,1),d=PD(CS.d),isT=CS.d==YMD(today0());
+  if($('mkCd'))$('mkCd').textContent=thLong(d);if($('mkCp')){$('mkCp').textContent=isT?'● วันนี้ — อัปเดตอัตโนมัติ':'ข้อมูลย้อนหลัง';$('mkCp').className='mk-pill'+(isT?' live':'')}
+  try{const[cr,pd,pn]=await Promise.all([pull(BSEL,q=>q.gte('created_at',f.toISOString()).lt('created_at',t.toISOString())),pull(BSEL,q=>q.eq('status','approved').gte('approved_at',f.toISOString()).lt('approved_at',t.toISOString())),pull('id,bill_no,total,created_at,seller_name',q=>q.eq('status','pending'))]);
+   if(tok!=CS.tok||!$('mkCb'))return;const C=cr.map(mapBill),Pd=pd.map(mapBill);HB=[...C,...Pd];CS.view=()=>closePaint(C,Pd,pn,f);CS.view()}
+  catch(e){if($('mkCb'))$('mkCb').innerHTML='<div class="card" style="color:var(--d)">โหลดข้อมูลไม่ได้: '+esc(e.message||e)+'</div>'}}
+ function closePaint(C,Pd,Pn,f){const el=$('mkCb');if(!el)return;const ok=C.filter(b=>b.status=='pending'||b.status=='approved'),bad=C.filter(b=>b.status=='void'||b.status=='rejected'),
+  sum=(a,fn)=>a.reduce((x,y)=>x+fn(y),0),amt=sum(ok,b=>b.total),L=ok.flatMap(b=>b.lines),kg=sum(L,l=>l.net),paidSame=ok.filter(b=>b.status=='approved'),pend=ok.filter(b=>b.status=='pending'),paidAmt=sum(Pd,b=>b.total),
+  old=Pn.filter(b=>new Date(b.created_at)<f),unaud=ok.filter(b=>b.audit!='ok'&&b.audit!='flagged'),flag=ok.filter(b=>b.audit=='flagged'),man=L.filter(l=>l.src=='manual').length,scl=L.filter(l=>l.src=='scale').length,
+  PR_={},ST={},PY={},H=Array(24).fill(0);
+  for(const b of ok){for(const l of b.lines){const p=PR_[l.name]=PR_[l.name]||{kg:0,amt:0,bills:new Set()};p.kg+=l.net;p.amt+=l.amount;p.bills.add(b.id)}
+   const s=ST[b.recorder||'-']=ST[b.recorder||'-']||{n:0,kg:0,amt:0,sc:0,mn:0};s.n++;s.amt+=b.total;for(const l of b.lines){s.kg+=l.net;if(l.src=='scale')s.sc++;else if(l.src=='manual')s.mn++}H[new Date(b.ts).getHours()]+=b.total}
+  for(const b of Pd){const p=PY[b.payer||'-']=PY[b.payer||'-']||{n:0,amt:0};p.n++;p.amt+=b.total}
+  const S_=(t,v,sub,c)=>`<div class="stat" style="border-top:4px solid ${c}"><span class="m">${t}</span><b>${v}</b>${sub?'<small class="m">'+sub+'</small>':''}</div>`,
+  prods=Object.entries(PR_).sort((a,b)=>b[1].amt-a[1].amt),mxp=prods[0]?prods[0][1].amt:1,
+  ck=(good,txt,sub)=>`<div class="mk-ck"><span style="font-size:20px">${good===true?'✅':good===false?'⚠️':'ℹ️'}</span><div><b>${txt}</b>${sub?'<div class="m">'+sub+'</div>':''}</div></div>`,ready=!Pn.length&&!flag.length;
+  const h0=Math.min(6,...H.map((v,i)=>v>0?i:99)),h1=Math.max(18,...H.map((v,i)=>v>0?i:-1)),hr=[];for(let i=h0;i<=h1;i++)hr.push(i);
+  el.innerHTML=`<div class="mk-banner ${ready?'ok':'warn'}">${ready?'✅ พร้อมปิดวัน — ไม่มีบิลค้างจ่ายและไม่พบรายการผิดปกติ':'⚠️ ยังมีเรื่องที่ควรเช็กก่อนปิดวัน (ดูรายการด้านล่าง)'}</div>
+  <div class="stats">${S_('🧾 บิลที่ชั่ง',ok.length,bad.length?'ยกเลิก/ปฏิเสธ '+bad.length+' บิล':'ไม่มีบิลยกเลิก','#8b5cf6')}${S_('💰 ยอดซื้อรวม',money(amt),L.length+' รายการสินค้า','#16a34a')}${S_('⚖ น้ำหนักสุทธิ (กก.)',f2(kg),kg?'เฉลี่ย ฿'+f2(amt/kg)+'/กก.':'','#2563eb')}${S_('✅ จ่ายเงินแล้ว (ตามเวลาจ่ายจริง)',money(paidAmt),Pd.length+' บิล'+(Pd.length!=paidSame.length?' (รวมบิลของวันอื่น)':''),'#14b8a6')}${S_('⏳ รอจ่าย (บิลของวันนี้)',money(sum(pend,b=>b.total)),pend.length+' บิล','#f59e0b')}${S_('📥 ค้างจ่ายสะสมทั้งหมด',money(sum(Pn,b=>+b.total)),Pn.length+' บิล'+(old.length?' · ค้างจากวันก่อน '+old.length:''),Pn.length?'#dc2626':'#94a3b8')}</div>
+  <div class="card"><b style="font-size:17px">📋 เช็กลิสต์ก่อนปิดวัน</b>${ck(!Pn.length,Pn.length?'มีบิลรอจ่ายเงิน '+Pn.length+' บิล รวม '+money(sum(Pn,b=>+b.total)):'ไม่มีบิลค้างจ่าย',old.length?'ค้างจากวันก่อนหน้า '+old.length+' บิล':'')}${ck(!flag.length,flag.length?'พบรายการผิดปกติ '+flag.length+' บิล':'ไม่พบรายการผิดปกติ',flag.map(b=>esc(b.no)+': '+esc(b.anote||'-')).join(' · '))}${ck(unaud.length?null:true,unaud.length?'ยังไม่ได้ตรวจรูป '+unaud.length+' บิล':'ตรวจรูปครบทุกบิลแล้ว','')}${ck(null,'น้ำหนักจากตาชั่ง '+scl+' รายการ · พิมพ์เอง '+man+' รายการ'+(L.length?' ('+(man/L.length*100).toFixed(0)+'% พิมพ์เอง)':''),'')}${bad.length?ck(null,'ยกเลิก/ปฏิเสธ '+bad.length+' บิล · '+money(sum(bad,b=>b.total)),bad.map(b=>esc(b.no)+' ('+esc(b.vr||'ปฏิเสธ')+')').join(' · ')):''}</div>
+  <div class="card"><b style="font-size:17px">🕒 ยอดซื้อตามช่วงเวลา</b><div id="mkHr"></div></div>
+  <div class="mk-2"><div class="card"><b style="font-size:17px">🏷 สินค้าที่รับซื้อ</b>${prods.map(([n,v])=>`<div class="bar"><span>${esc(n)}<br><span class="m">${f2(v.kg)} กก. · ${v.bills.size} บิล · ฿${v.kg?f2(v.amt/v.kg):'-'}/กก.</span></span><div><i style="width:${v.amt/mxp*100}%"></i></div><b>${money(v.amt)}</b></div>`).join('')||'<div class="m" style="padding:10px 0">ไม่มีรายการ</div>'}</div>
+  <div class="card"><b style="font-size:17px">👥 ตามพนักงานชั่ง</b><table><tr><th>พนักงาน</th><th class="n">บิล</th><th class="n">กก.</th><th class="n">฿</th><th>ตาชั่ง/พิมพ์</th></tr>${Object.entries(ST).sort((a,b)=>b[1].amt-a[1].amt).map(([n,v])=>`<tr><td>${esc(n)}</td><td class="n">${v.n}</td><td class="n">${f2(v.kg)}</td><td class="n">${f2(v.amt)}</td><td>⚖${v.sc} ✍${v.mn}</td></tr>`).join('')||'<tr><td colspan="5" class="m">ไม่มีรายการ</td></tr>'}</table>
+  <b style="font-size:17px;display:block;margin-top:14px">💵 ผู้จ่ายเงิน (ตามเวลาจ่ายจริง)</b><table><tr><th>ผู้จ่าย</th><th class="n">บิล</th><th class="n">ยอดจ่าย (฿)</th></tr>${Object.entries(PY).map(([n,v])=>`<tr><td>${esc(n)}</td><td class="n">${v.n}</td><td class="n">${f2(v.amt)}</td></tr>`).join('')||'<tr><td colspan="3" class="m">ยังไม่มีการจ่ายเงิน</td></tr>'}<tr><th>รวม</th><th class="n">${Pd.length}</th><th class="n">${f2(paidAmt)}</th></tr></table></div></div>
+  <div class="card" style="overflow-x:auto"><b style="font-size:17px">🧾 บิลทั้งหมดของวันนี้ (${C.length})</b><table><tr><th>เวลา</th><th>เลขบิล</th><th>เครื่อง</th><th>ผู้ชั่ง</th><th>ผู้ขาย</th><th class="n">ยอด (฿)</th><th>สถานะ</th></tr>${C.map(b=>`<tr onclick="showBill('${b.id}')" style="cursor:pointer${b.status=='void'||b.status=='rejected'?';opacity:.55;text-decoration:line-through':''}"><td>${new Date(b.ts).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</td><td><b>${esc(b.no)}</b></td><td>${esc(b.scale||'-')}</td><td>${esc(b.recorder)}</td><td>${esc(b.seller)}</td><td class="n"><b>${f2(b.total)}</b></td><td>${stageHtml(b)}</td></tr>`).join('')||'<tr><td colspan="7" class="m">ไม่มีบิลในวันนี้</td></tr>'}<tr><th colspan="5">รวม (ไม่นับยกเลิก/ปฏิเสธ)</th><th class="n">${f2(amt)}</th><th></th></tr></table></div>
+  <div class="card row"><button class="bt-blue" id="mkPrint">🖨 พิมพ์สรุปประจำวัน</button><button id="mkCsv2">⬇ ดาวน์โหลด CSV</button></div>`;
+  drawChart($('mkHr'),{labels:hr.map(h=>Z(h)+':00'),vals:hr.map(h=>H[h]),H:200,aria:'ยอดซื้อตามชั่วโมง',tip:i=>`<b>${Z(hr[i])}:00 – ${Z(hr[i])}:59</b><br>ยอดซื้อ ${money(H[hr[i]])}`});
+  $('mkCsv2').onclick=()=>{const R=[['วันที่','เวลา','เลขบิล','เครื่อง','ผู้ชั่ง','ผู้ขาย','สินค้า','น้ำหนักสุทธิ(กก.)','ราคา/กก.','เป็นเงิน','น้ำหนักจาก','สถานะ']];
+   C.forEach(b=>b.lines.forEach(l=>R.push([CS.d,new Date(b.ts).toLocaleTimeString('th-TH'),b.no,b.scale||'',b.recorder,b.seller,l.name,l.net,l.price,l.amount,l.src=='scale'?'ตาชั่ง':l.src=='manual'?'พิมพ์เอง':'',b.status])));dl('close_'+CS.d+'.csv','﻿'+R.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n'),'text/csv')};
+  $('mkPrint').onclick=()=>{const dec=s=>String(s).replace(/(\d)\.(\d)/g,'$1<span class="dp">.</span>$2'),w=PR.w==58?46:70,row=(a,b,st)=>`<div style="display:flex;justify-content:space-between;gap:6px;${st||''}"><span>${dec(esc(a))}</span><span style="white-space:nowrap">${dec(esc(b))}</span></div>`,
+   body=`<div style="text-align:center;font-weight:700;font-size:15px">${esc(S.shop)}</div><div style="text-align:center">สรุปยอดประจำวัน</div><div style="text-align:center">${esc(thLong(PD(CS.d)))}</div><hr>`+
+   row('จำนวนบิล',ok.length+' บิล')+row('น้ำหนักสุทธิรวม',f2(kg)+' กก.')+row('ยอดซื้อรวม',f2(amt)+' บาท','font-weight:700;font-size:15px')+row('จ่ายเงินแล้ว',f2(paidAmt)+' บาท')+row('รอจ่าย (บิลวันนี้)',f2(sum(pend,b=>b.total))+' บาท')+row('ค้างจ่ายสะสม',f2(sum(Pn,b=>+b.total))+' บาท')+'<hr>'+
+   prods.map(([n,v])=>`<div style="font-weight:700">${esc(n)}</div>`+row('  '+f2(v.kg)+' กก.',f2(v.amt)+' บาท')).join('')+'<hr>'+row('พิมพ์เมื่อ',new Date().toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}))+`<div style="height:12px"></div><div>ลงชื่อผู้ปิดวัน ______________</div>`;
+   printHtml(`<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700;900&display=swap" rel="stylesheet"><style>@page{size:${PR.w}mm auto;margin:0}html,body{margin:0}body{padding:2mm 3mm;width:${w}mm;font:12px/1.4 Prompt,sans-serif;color:#000}hr{border:0;border-top:1px dashed #000;margin:4px 0}.dp{font-weight:900;font-size:1.6em;line-height:0;padding:0 .06em}</style></head><body>${body}</body></html>`)}}
+ // อัปเดตอัตโนมัติทุก 30 วินาที เมื่ออยู่หน้านี้และดูวันนี้
+ setInterval(()=>{if(document.hidden||!$('close')?.classList.contains('on')||CS.d!=YMD(today0())||!$('mkCb'))return;closeLoad()},30000);
+ const css=document.createElement('style');css.textContent=`
+ .mk-chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.mk-chips .chip{padding:7px 14px;min-height:0;font-size:14px}.mk-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+ .mk-svg text{fill:var(--m);font:11px Prompt,system-ui,sans-serif}.mk-svg .vl{fill:var(--t);font-size:10.5px;font-weight:600}.mk-svg .gl{stroke:var(--b);stroke-width:1}.mk-svg .bar{fill:var(--bl)}.mk-svg .ma{fill:none;stroke:#f59e0b;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.mk-svg .hv{fill:var(--bl);opacity:0}
+ .mk-tip{position:absolute;top:0;display:none;pointer-events:none;background:#0f1b2d;color:#fff;border-radius:8px;padding:7px 11px;font-size:12px;line-height:1.5;box-shadow:0 2px 10px #0006;white-space:nowrap;z-index:3}
+ .mk-hero{background:linear-gradient(135deg,#0f1b2d,#1e3a8a 60%,#0d9488);color:#fff;border-radius:16px;padding:16px 18px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+ .mk-hs{font-size:13px;opacity:.8}.mk-hd{font-size:24px;font-weight:800;margin:2px 0 6px}.mk-pill{display:inline-block;background:#ffffff26;border-radius:99px;padding:2px 12px;font-size:12px}.mk-pill.live{background:#16a34a}
+ .mk-hn{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.mk-hn button{background:#ffffff26;color:#fff;border:0;padding:8px 14px}.mk-hn input{width:auto;background:#ffffff1f;color:#fff;border:1px solid #ffffff55;color-scheme:dark}
+ .mk-banner{border-radius:12px;padding:12px 16px;font-weight:700;margin-bottom:10px}.mk-banner.ok{background:#dcfce7;color:#14532d;border:1px solid #86efac}.mk-banner.warn{background:#fef3c7;color:#78350f;border:1px solid #fcd34d}
+ .mk-ck{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--b)}.mk-ck:last-child{border-bottom:0}
+ .mk-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}@media(max-width:800px){.mk-2{grid-template-columns:1fr}.mk-hd{font-size:20px}}
+ .stat small{display:block;margin-top:2px}.mk-tr .stats{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.mk-tr .stat b,#mkCb .stat b{font-size:clamp(18px,2vw,24px);overflow-wrap:anywhere}nav button[data-t=close]{--c1:#14b8a6}`;document.head.appendChild(css);
 })();
 </script>
 
