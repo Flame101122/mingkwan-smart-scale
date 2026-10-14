@@ -79,6 +79,16 @@ nav.open{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
 .pb{white-space:normal;overflow-wrap:anywhere;width:100%;min-height:68px;padding:10px 6px;border:1px solid #0002;border-radius:10px;font-weight:600;color:#2b2b2b}
 .wd{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:600px){.wd{grid-template-columns:1fr}}
 .np{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.np button{font-size:22px;padding:14px;width:100%}
+
+/* Image viewer: click evidence thumbnails to inspect at full size */
+.img-view-thumb{cursor:zoom-in!important;transition:transform .12s ease,box-shadow .12s ease}
+.img-view-thumb:hover{box-shadow:0 0 0 2px #2563eb}
+#mk-img-viewer{position:fixed;inset:0;z-index:99999;background:rgba(4,9,18,.92);display:none;align-items:center;justify-content:center;padding:56px 16px 24px}
+#mk-img-viewer.show{display:flex}
+#mk-img-viewer img{display:block;max-width:min(96vw,1600px);max-height:calc(100vh - 100px);width:auto;height:auto;object-fit:contain;border-radius:8px;box-shadow:0 8px 35px #0009;background:#fff}
+#mk-img-viewer .mkiv-close{position:absolute;right:14px;top:12px;width:46px;height:46px;border:0;border-radius:50%;background:#fff;color:#111;font-size:28px;line-height:1;padding:0}
+#mk-img-viewer .mkiv-caption{position:absolute;top:18px;left:70px;right:70px;text-align:center;color:#fff;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:600px){#mk-img-viewer{padding:58px 8px 12px}#mk-img-viewer img{max-width:98vw;max-height:calc(100vh - 86px)}#mk-img-viewer .mkiv-caption{font-size:12px;top:22px}}
 </style></head><body>
 
 <header><div class="brand"><div><div class="khw"><i>KH</i>W</div><small id="shopn">Mingkwan Smart Scale</small></div><button id="mb" onclick="$('nav').classList.toggle('open')" aria-label="เมนู">☰ เมนู</button><button id="lo2" onclick="chPw()" aria-label="เปลี่ยนรหัสผ่าน">🔑</button><button id="lo" onclick="logout()">ออก</button></div><div id="who"></div>
@@ -109,7 +119,7 @@ nav.open{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
 </section>
 <section id="admin"></section><section id="audit"></section><section id="stock"></section><section id="dash"></section><section id="mine"></section><section id="truck"></section><section id="hist"></section><section id="staff"></section><section id="prod"></section><section id="rep"></section><section id="set"></section>
 </main><dialog id="wd" style="max-width:860px;width:96%;border-radius:12px;background:var(--c);color:var(--t)">
- <div><b id="wt" style="font-size:22px"></b> <span class="m" id="wp"></span></div><select id="pid" hidden></select>
+ <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><b id="wt" style="font-size:22px"></b><span class="m" id="wp"></span><div style="margin-left:auto;min-width:190px"><label for="unitPrice" style="margin:0 0 3px">ราคาที่ใช้กับรายการนี้ (บาท/กก.)</label><input id="unitPrice" type="number" min="0" step="0.01" inputmode="decimal" oninput="calc()" style="font-size:20px;font-weight:700;width:100%"><small class="m">แก้เฉพาะบิลนี้ ไม่เปลี่ยนราคามาตรฐานสินค้า</small></div></div><select id="pid" hidden></select>
  <div class="wd3" style="margin-top:10px">
   <div><video id="vid" autoplay playsinline muted></video><button style="width:100%;margin-top:6px" onclick="snap()">📷 ถ่ายเพิ่ม</button><button style="width:100%;margin-top:6px" onclick="teachCur()">📚 สอนกล้อง: นี่คือสินค้านี้</button><div class="ph" id="phs"></div></div>
   <div><div class="m">ค่าจากตาชั่ง (กก.)</div><div class="big" id="live" style="font-size:30px">0.00</div>
@@ -133,7 +143,7 @@ function dlg(title,{input=false,ok='ตกลง',danger=false,no='ยกเล�
  d.innerHTML=`<b>${esc(title)}</b>${body}${input?`<textarea id="di" rows="3" style="margin-top:8px" placeholder="${esc(ph)}">${esc(init)}</textarea>`:''}<div class="row" style="margin-top:10px"><button id="dn">${no}</button><button id="dk" class="${danger?'dan':'pri'}">${ok}</button></div>`;
  document.body.appendChild(d);d.showModal();const done=v=>{d.remove();r(v)};d.oncancel=()=>done(null);d.querySelector('#dn').onclick=()=>done(null);
  d.querySelector('#dk').onclick=()=>{const v=input?d.querySelector('#di').value.trim():true;if(input&&!v)return d.querySelector('#di').focus();done(v)}})}
-const BUILD='2026-10-08 r9';console.log('Mingkwan build',BUILD);
+const BUILD='2026-10-13 r10';console.log('Mingkwan build',BUILD);
 const sb=supabase.createClient('https://sunifccylaokivalwjic.supabase.co','sb_publishable_mNYJioB49fgTQZZzQq3zgg_QpA0fu2n',{global:{fetch:(u,o)=>fetch(u,{...o,cache:'no-store'})}});
 let ME=null,T=[],saving=false;const TABS={clerk:['weigh','truck','dash','mine'],cashier:['dash','admin','hist','stock','rep'],admin:['weigh','truck','dash','admin','hist','staff','audit','stock','rep','prod','set']},RL={clerk:'User — พนักงานชั่ง',cashier:'ผู้จ่ายเงิน/บัญชี',admin:'Admin'},can=t=>TABS[ME?.role]?.includes(t),FRONT=['weigh','truck','dash','mine'],TC={weigh:'#22c55e',truck:'#0ea5e9',dash:'#818cf8',mine:'#2dd4bf',admin:'#f59e0b',hist:'#a78bfa',audit:'#f472b6',stock:'#fb923c',rep:'#60a5fa',prod:'#a3e635',set:'#94a3b8',staff:'#e879f9'};
 let S={shop:'Mingkwan Smart Scale',recorder:'พนักงาน 1',pin:'1234',tares:'ตะกร้าเล็ก:1.2,ตะกร้าใหญ่:2.5,กระสอบ:0.3',unit:'kg'};
@@ -191,7 +201,7 @@ function snap(){const v=$('vid');if(!v.videoWidth)return toast('ยังไม�
  wph.push(c.toDataURL('image/jpeg',.6));rPh()}
 const PHU={},phUrl=x=>!x?'':(x.startsWith('data:')?x:(PHU[x]||''));
 let wph=[];
-function rPh(){$('phs').innerHTML=wph.map((p,i)=>`<div class="pth"><img src="${phUrl(p)}"><button aria-label="ลบรูป" onclick="delPh(${i})">✕</button></div>`).join('')}
+function rPh(){$('phs').innerHTML=wph.map((p,i)=>`<div class="pth"><img class="img-view-thumb" src="${phUrl(p)}" alt="รูปที่ถ่าย" title="กดเพื่อดูรูปใหญ่" tabindex="0"><button aria-label="ลบรูป" onclick="delPh(${i})">✕</button></div>`).join('')}
 function delPh(i){wph.splice(i,1);rPh()}
 // ---------- scale (Web Serial) ----------
 let NAMES={},LOADED=false;
@@ -231,7 +241,7 @@ function oskBtnVis(){const b=document.getElementById('oskbtn');if(b)b.style.disp
  b.onclick=()=>{if(oskEl?.classList.contains('show'))return oskHide();const a=document.activeElement,t=a&&a.matches&&a.matches('input,textarea')?a:lastInput;if(t&&document.contains(t))oskFor(t);else toast('แตะช่องที่จะพิมพ์ก่อน แล้วกดปุ่ม ⌨ นี้')};
  b.addEventListener('mousedown',e=>e.preventDefault());document.body.appendChild(b);oskBtnVis()})();
 async function insItems(rows){let{error}=await sb.from('bill_items').insert(rows);if(error&&/weight_src/.test(error.message)){rows=rows.map(({weight_src,...r})=>r);({error}=await sb.from('bill_items').insert(rows))}if(error)throw error}
-let SC={baud:9600,data:8,parity:'none',stop:1,unit:'kg',pick:'first',mode:'auto',auto:true,lock:false,autoConn:true,cmd:'',id:'ชั่ง 1',dp:0,once:false,sig:'both',flow:'none',last:null},scPort=null,scRd=null,scOn=false,scBuf='',scHist=[],scRaw=[],scTmr=null,scBytes=0,scIdle=null,scLast=null,scT0=0,gsrc='manual';
+let SC={baud:1200,data:8,parity:'none',stop:1,unit:'kg',pick:'first',mode:'auto',auto:true,lock:false,autoConn:true,cmd:'',id:'ชั่ง 1',dp:0,once:false,sig:'both',flow:'none',last:null},scPort=null,scRd=null,scOn=false,scBuf='',scHist=[],scRaw=[],scTmr=null,scBytes=0,scIdle=null,scLast=null,scT0=0,gsrc='manual';
 try{Object.assign(SC,JSON.parse(localStorage.getItem('mk_scale')||'{}'))}catch(e){}
 const scSave=()=>localStorage.setItem('mk_scale',JSON.stringify(SC));
 function parseW(t){if(SC.mode=='reverse')t=[...t].reverse().join('');
@@ -244,37 +254,97 @@ function scFeed(w,st){liveW=w;scLast=w;scHist.push(w);if(scHist.length>6)scHist.
  const stable=w>0&&(SC.once||st===true||(st===null&&scHist.length>=5&&Math.max(...scHist)-Math.min(...scHist)<=0.01));
  $('live').textContent=f2(w);$('lw2').textContent=f2(w);$('lw2').style.color=stable?'#16a34a':'';
  if(SC.auto&&stable&&$('wd').open&&($('gross').value===''||gsrc=='scale')&&Math.abs((+$('gross').value)-w)>0.0001){$('gross').value=w;gsrc='scale';calc()}}
-setInterval(()=>{if(!scOn||!$('scm'))return;const age=Date.now()-scT0;
+const m7=t=>t.replace(/[\x80-\xff]/g,c=>String.fromCharCode(c.charCodeAt(0)&127));
+let scJunk=0,scTot=0,scTried=false,scBusy=false;
+function scoreText(txt){const t=m7(txt),n=t.length||1,pr=[...t].filter(c=>/[\x20-\x7e\r\n\x02\x03]/.test(c)).length/n,dg=(t.match(/\d/g)||[]).length,ls=t.split(/[\r\n\x02\x03]+/).filter(x=>x.trim()&&/^[\x20-\x7e]+$/.test(x)),hits=ls.filter(x=>parseW(x)).length;
+ return{score:pr>0.9&&dg>0?hits*10+Math.min(dg,50)/10:0,sample:ls.slice(0,2).join(' | ').slice(0,60)}}
+async function scRescue(){if(scBusy||!scPort)return;scBusy=true;scTried=true;const port=scPort;toast('ตรวจพบสัญญาณเพี้ยน (baud ไม่ตรง) — กำลังหา baud ที่ถูกต้องอัตโนมัติ ใช้เวลาประมาณ 15 วินาที',9000);
+ try{await scClose();let best=null;
+  for(const[b,d,p,s]of[[1200,8,'none',1],[1200,7,'even',1],[1200,7,'odd',1],[2400,8,'none',1],[2400,7,'even',1],[600,8,'none',1],[4800,8,'none',1],[4800,7,'even',1],[300,8,'none',1],[9600,7,'even',1]]){
+   try{await port.open({baudRate:b,dataBits:d,parity:p,stopBits:s})}catch(e){continue}
+   try{await port.setSignals({dataTerminalReady:SC.sig=='both'||SC.sig=='dtr',requestToSend:SC.sig=='both'||SC.sig=='rts'})}catch(e){}
+   let txt='';const rd=port.readable.getReader(),to=setTimeout(()=>rd.cancel(),1500),dec=new TextDecoder('latin1');
+   try{for(;;){const{value,done}=await rd.read();if(done)break;txt+=m7(dec.decode(value))}}catch(e){}clearTimeout(to);try{rd.releaseLock()}catch(e){}try{await port.close()}catch(e){}
+   const sc=scoreText(txt);if(sc.score>0&&(!best||sc.score>best.score)){best={b,d,p,s,score:sc.score,sample:sc.sample};if(sc.score>=60)break}}
+  if(best){Object.assign(SC,{baud:best.b,data:best.d,parity:best.p,stop:best.s});scSave();toast('✅ พบแล้ว: '+best.b+' baud · ตัวอย่างข้อมูล: '+best.sample,12000)}
+  else toast('ไม่พบ baud ที่อ่านเป็นข้อความได้ — ลองตั้งค่าเองใน ⚙ หรือคัดลอกข้อมูลดิบส่งให้ผู้พัฒนา',9000);
+  await scOpen(port)}catch(e){toast('ตรวจหา baud ไม่สำเร็จ: '+e.message,7000)}finally{scBusy=false}}
+setInterval(()=>{if(!scOn||!$('scm'))return;const age=Date.now()-scT0;if(!scBusy&&!scTried&&scTot>300&&scJunk/scTot>.85){scRescue();return}
  if(scBytes==0&&age>6000){$('scm').textContent='⚠ เชื่อมต่อแล้วแต่ยังไม่ได้รับข้อมูลจากตาชั่งเลย — เปิด ⚙ ตั้งค่า ดูวิธีเช็ก';$('scm').style.color='#dc2626'}
  else if(scBytes>0&&scLast==null){$('scm').textContent='รับข้อมูลแล้ว ('+scBytes+' ไบต์) แต่อ่านเป็นน้ำหนักไม่ได้ — เปิด ⚙ ดูข้อมูลดิบ แล้วส่งให้ผู้พัฒนา';$('scm').style.color='#f59e0b'}
  else{scStatus();$('scm').style.color=''}},1000);
-async function scLoop(port){const dec=new TextDecoder('latin1');scRd=port.readable.getReader();
- try{for(;;){const{value,done}=await scRd.read();if(done)break;const t=dec.decode(value,{stream:true});scBytes+=value.length;
-  scRaw.push({t:new Date().toLocaleTimeString(),x:t.replace(/\r/g,'\\r').replace(/\n/g,'\\n'),h:[...value].map(b=>b.toString(16).padStart(2,'0')).join(' ')});if(scRaw.length>25)scRaw.shift();rawView();
-  scBuf+=t;const ls=scBuf.split(/[\r\n\x02\x03]+/);scBuf=ls.pop();if(scBuf.length>30){const r=parseW(scBuf);if(r)scFeed(r.w,r.st);scBuf=''}for(const l of ls){const r=parseW(l);if(r)scFeed(r.w,r.st)}clearTimeout(scIdle);scIdle=setTimeout(()=>{if(scBuf.trim()){const r=parseW(scBuf);if(r)scFeed(r.w,r.st);scBuf=''}},80)}}
- catch(e){}finally{try{scRd.releaseLock()}catch(e){}scRd=null}
- if(scPort===port){scPort=null;scOn=false;clearInterval(scTmr);try{await port.close()}catch(e){}scStatus()}}
-async function scOpen(port){await port.open({baudRate:+SC.baud,dataBits:+SC.data,parity:SC.parity,stopBits:+SC.stop,flowControl:SC.flow=='hardware'?'hardware':'none'});try{await port.setSignals({dataTerminalReady:SC.sig=='both'||SC.sig=='dtr',requestToSend:SC.sig=='both'||SC.sig=='rts'})}catch(e){}try{const i=port.getInfo?.();if(i&&i.usbVendorId){SC.last={v:i.usbVendorId,p:i.usbProductId};scSave()}}catch(e){}scPort=port;scBytes=0;scOn=true;scT0=Date.now();scBuf='';scHist=[];scStatus();scLoop(port);clearInterval(scTmr);
+async function scLoop(port){
+ const dec=new TextDecoder('latin1');
+ scRd=port.readable.getReader();
+ try{
+  for(;;){
+   const {value,done}=await scRd.read();
+   if(done)break;
+   if(!value||!value.length)continue;
+   const t=dec.decode(value,{stream:false});
+   scBytes+=value.length;
+   let chunkText=true;
+   for(const b of value){
+    scTot++;
+    if(b===0||b===0x80||b===0xff||b===0xfe||b===0xe0||b===0xf8)scJunk++;
+    // Accept only ASCII text and the common serial line delimiters.
+    if(!((b>=0x20&&b<=0x7e)||b===0x0d||b===0x0a||b===0x02||b===0x03))chunkText=false;
+   }
+   scRaw.push({t:new Date().toLocaleTimeString(),x:t.replace(/\r/g,'\\r').replace(/\n/g,'\\n'),h:[...value].map(b=>b.toString(16).padStart(2,'0')).join(' ')});
+   if(scRaw.length>25)scRaw.shift();
+   rawView();
+   // If a chunk contains binary bytes (for example 00/80), keep it in RAW HEX only.
+   // Never strip the high bit and then parse the resulting NUL bytes as a fake 0 kg.
+   if(!chunkText){scBuf='';clearTimeout(scIdle);continue;}
+   scBuf+=t;
+   const ls=scBuf.split(/[\r\n\x02\x03]+/);
+   scBuf=ls.pop();
+   for(const line of ls){
+    const clean=line.trim();
+    if(!clean||!/[0-9]/.test(clean)||!/^[\x20-\x7e]+$/.test(clean))continue;
+    const r=parseW(clean);
+    if(r&&Number.isFinite(r.w)&&r.w>=0)scFeed(r.w,r.st);
+   }
+   if(scBuf.length>80)scBuf='';
+   clearTimeout(scIdle);
+   scIdle=setTimeout(()=>{
+    const clean=scBuf.trim();
+    if(clean&&/[0-9]/.test(clean)&&/^[\x20-\x7e]+$/.test(clean)){
+     const r=parseW(clean);
+     if(r&&Number.isFinite(r.w)&&r.w>=0)scFeed(r.w,r.st);
+    }
+    scBuf='';
+   },100);
+  }
+ }catch(e){
+  if(scOn&&scPort===port)console.warn('Scale serial read error:',e);
+ }finally{
+  try{scRd?.releaseLock()}catch(e){}
+  scRd=null;
+ }
+ if(scPort===port){scPort=null;scOn=false;clearInterval(scTmr);try{await port.close()}catch(e){}scStatus()}
+}
+async function scOpen(port){await port.open({baudRate:+SC.baud,dataBits:+SC.data,parity:SC.parity,stopBits:+SC.stop,flowControl:SC.flow=='hardware'?'hardware':'none'});try{await port.setSignals({dataTerminalReady:SC.sig=='both'||SC.sig=='dtr',requestToSend:SC.sig=='both'||SC.sig=='rts'})}catch(e){}try{const i=port.getInfo?.();if(i&&i.usbVendorId){SC.last={v:i.usbVendorId,p:i.usbProductId};scSave()}}catch(e){}scPort=port;scBytes=0;scJunk=0;scTot=0;scOn=true;scT0=Date.now();scBuf='';scHist=[];scStatus();scLoop(port);clearInterval(scTmr);
  if(SC.cmd){const cmd=SC.cmd.replace(/\\r/g,'\r').replace(/\\n/g,'\n').replace(/\\x([0-9a-f]{2})/gi,(_,h)=>String.fromCharCode(parseInt(h,16))),bytes=Uint8Array.from([...cmd].map(c=>c.charCodeAt(0)));
   scTmr=setInterval(async()=>{try{const w=port.writable.getWriter();await w.write(bytes);w.releaseLock()}catch(e){}},500)}}
 async function scClose(){const p=scPort;scPort=null;scOn=false;clearInterval(scTmr);try{await scRd?.cancel()}catch(e){}await new Promise(r=>setTimeout(r,80));try{await p?.close()}catch(e){}scStatus()}
 async function scToggle(){if(scOn)return scClose();if(!('serial' in navigator))return toast('เบราว์เซอร์นี้ต่อตาชั่งไม่ได้ (ใช้ Chrome หรือ Edge บนคอม)');
- try{await scOpen(await navigator.serial.requestPort())}catch(e){toast('ต่อตาชั่งไม่ได้: '+e.message)}}
-async function scAuto(force){if(!('serial' in navigator)||(!SC.autoConn&&!force))return;try{const ps=(await navigator.serial.getPorts()).filter(x=>!x.readable),m=(x,L)=>{const i=x.getInfo?.()||{};return L&&i.usbVendorId==L.v&&i.usbProductId==L.p};if(ps.length&&!scOn){const a=ps.find(x=>m(x,SC.last))||ps.find(x=>!(PR.mode=='escpos'&&m(x,PR.last)));if(a)await scOpen(a)}}catch(e){}}
+ scTried=false;try{await scOpen(await navigator.serial.requestPort())}catch(e){toast('ต่อตาชั่งไม่ได้: '+e.message)}}
+async function scAuto(force){if(!('serial' in navigator)||(!SC.autoConn&&!force))return;try{const ps=(await navigator.serial.getPorts()).filter(x=>!x.readable),m=(x,L)=>{const i=x.getInfo?.()||{};return L&&i.usbVendorId==L.v&&i.usbProductId==L.p};if(ps.length&&!scOn){const a=ps.find(x=>m(x,SC.last))||ps.find(x=>!(PR.mode=='escpos'&&m(x,PR.last)));if(a){scTried=false;await scOpen(a)}}}catch(e){}}
 if('serial' in navigator){navigator.serial.addEventListener('disconnect',e=>{if(e.target!==scPort)return;scOn=false;scPort=null;clearInterval(scTmr);scStatus()});navigator.serial.addEventListener('connect',()=>scAuto())}
 async function scDetect(){if(!('serial' in navigator))return toast('ใช้ Chrome หรือ Edge บนคอม');let port;try{port=await navigator.serial.requestPort()}catch(e){return}
  if(scOn)await scClose();let best=null;
- for(const[b,d,p,s]of[[9600,8,'none',1],[4800,8,'none',1],[2400,8,'none',1],[19200,8,'none',1],[9600,7,'even',1],[9600,8,'even',1],[1200,7,'even',1],[38400,8,'none',1],[115200,8,'none',1]]){
+ for(const[b,d,p,s]of[[1200,8,'none',1],[1200,7,'even',1],[1200,7,'odd',1],[9600,8,'none',1],[4800,8,'none',1],[2400,8,'none',1],[2400,7,'even',1],[600,8,'none',1],[19200,8,'none',1],[9600,7,'even',1],[9600,8,'even',1],[4800,7,'even',1],[300,8,'none',1],[38400,8,'none',1],[115200,8,'none',1]]){
   toast('ทดสอบ '+b+' baud '+d+p[0].toUpperCase()+s+' ... (กดปุ่ม Print ที่ตาชั่งซ้ำ ๆ ระหว่างนี้)');try{await port.open({baudRate:b,dataBits:d,parity:p,stopBits:s})}catch(e){continue}
   let txt='';const rd=port.readable.getReader(),to=setTimeout(()=>rd.cancel(),1600),dec=new TextDecoder('latin1');
-  try{for(;;){const{value,done}=await rd.read();if(done)break;txt+=dec.decode(value)}}catch(e){}clearTimeout(to);try{rd.releaseLock()}catch(e){}try{await port.close()}catch(e){}
+  try{for(;;){const{value,done}=await rd.read();if(done)break;txt+=m7(dec.decode(value))}}catch(e){}clearTimeout(to);try{rd.releaseLock()}catch(e){}try{await port.close()}catch(e){}
   const hits=txt.split(/[\r\n]+/).filter(x=>x.trim()&&/^[\x20-\x7e]+$/.test(x)&&parseW(x)).length;if(hits>=2&&(!best||hits>best.hits))best={b,d,p,s,hits}}
  if(!best){toast('ไม่พบข้อมูลที่ตาชั่งส่งเอง — ลองส่งคำสั่งขอค่า...',5000);
   for(const[b,d,p,s]of[[9600,8,'none',1],[4800,8,'none',1],[2400,8,'none',1],[9600,7,'even',1]]){
    try{await port.open({baudRate:b,dataBits:d,parity:p,stopBits:s})}catch(e){continue}
    for(const c of['P\r\n','W\r\n','R\r\n','S\r\n','\x05','\x02']){let txt='';const rd=port.readable.getReader(),to=setTimeout(()=>rd.cancel(),700),dec=new TextDecoder('latin1');
     try{const w=port.writable.getWriter();await w.write(Uint8Array.from([...c].map(x=>x.charCodeAt(0))));w.releaseLock()}catch(e){}
-    try{for(;;){const{value,done}=await rd.read();if(done)break;txt+=dec.decode(value)}}catch(e){}clearTimeout(to);try{rd.releaseLock()}catch(e){}
+    try{for(;;){const{value,done}=await rd.read();if(done)break;txt+=m7(dec.decode(value))}}catch(e){}clearTimeout(to);try{rd.releaseLock()}catch(e){}
     const hits=txt.split(/[\r\n]+/).filter(x=>x.trim()&&/^[\x20-\x7e]+$/.test(x)&&parseW(x)).length;if(hits>=1){best={b,d,p,s,hits,cmd:c};break}}
    try{await port.close()}catch(e){}if(best)break}}
  if(!best)return toast('ไม่พบข้อมูลจากตาชั่ง: ตรวจสาย/ให้ตาชั่งอยู่โหมดส่งข้อมูล (บางรุ่นต้องกด Print) หรือใส่ "คำสั่งขอค่า" ในตั้งค่า');
@@ -286,8 +356,8 @@ async function scLoopTest(){if(!scOn||!scPort?.writable)return toast('ต้อ�
  await dlg(ok?'ผลทดสอบวนกลับ: ผ่าน':'ผลทดสอบวนกลับ: ไม่ผ่าน',{body,ok:'ตกลง',no:'ปิด'})}
 function scInfo(){const i=scPort?.getInfo?.()||{};if(!scPort)return 'พอร์ต: -';if(!i.usbVendorId)return 'พอร์ต: ไม่ทราบรุ่นชิป (อาจเป็นพอร์ต COM ในเครื่อง)';const h=n=>(n||0).toString(16).padStart(4,'0'),v=h(i.usbVendorId),nm={'067b':'Prolific PL2303','0403':'FTDI','1a86':'CH340/CH341','10c4':'Silicon Labs CP210x','04e2':'Exar'}[v];return 'พอร์ต: USB '+v.toUpperCase()+':'+h(i.usbProductId).toUpperCase()+(nm?' ('+nm+')':'')}
 function useLive(){if(!scOn)return toast('ยังไม่ได้เชื่อมต่อตาชั่ง');$('gross').value=liveW;gsrc='scale';calc()}
-function rawView(){const el=window._rawEl;if(!el)return;const hint=scOn&&scBytes==0&&Date.now()-scT0>6000?'\n⚠ ยังไม่ได้รับข้อมูลเลย: (1) ตาชั่งต้องมีช่องส่งข้อมูล RS-232 และตั้งให้ส่ง (2) สาย TX ของตาชั่ง → ขา 2 ของพอร์ตคอม, GND → ขา 5 (3) ลองหัวสลับสาย (null-modem) (4) กด "ทดสอบวนกลับ" เช็กตัวแปลง (ถอดสายตาชั่งก่อน)':'';
- el.textContent=scInfo()+'\nรับแล้ว '+scBytes+' ไบต์ · '+(scOn?'เชื่อมต่ออยู่':'ยังไม่ได้เชื่อมต่อ')+' · อ่านค่าล่าสุด: '+(scLast==null?'-':f2(scLast)+' กก.')+hint+'\n'+(scRaw.map(r=>r.t+'  '+r.x+'\n           HEX '+r.h).join('\n')||'(ยังไม่มีข้อมูล — ต่อตาชั่งแล้ววางของบนตาชั่ง)');el.scrollTop=el.scrollHeight}
+function rawView(){const el=window._rawEl;if(!el)return;const hint2=scTot>200&&scJunk/scTot>.85?'\n⚠ สัญญาณเพี้ยน (ได้แต่ 0x00/0x80 ซ้ำ ๆ) = baud ไม่ตรง ตาชั่งน่าจะส่งที่ 1200 — ระบบกำลังหาให้เอง หรือเลือก Baud 1200 แล้วบันทึก':'';const hint=scOn&&scBytes==0&&Date.now()-scT0>6000?'\n⚠ ยังไม่ได้รับข้อมูลเลย: (1) ตาชั่งต้องมีช่องส่งข้อมูล RS-232 และตั้งให้ส่ง (2) สาย TX ของตาชั่ง → ขา 2 ของพอร์ตคอม, GND → ขา 5 (3) ลองหัวสลับสาย (null-modem) (4) กด "ทดสอบวนกลับ" เช็กตัวแปลง (ถอดสายตาชั่งก่อน)':'';
+ el.textContent=scInfo()+'\nรับแล้ว '+scBytes+' ไบต์ · '+(scOn?'เชื่อมต่ออยู่':'ยังไม่ได้เชื่อมต่อ')+' · อ่านค่าล่าสุด: '+(scLast==null?'-':f2(scLast)+' กก.')+hint+hint2+'\n'+(scRaw.map(r=>r.t+'  '+r.x+'\n           HEX '+r.h).join('\n')||'(ยังไม่มีข้อมูล — ต่อตาชั่งแล้ววางของบนตาชั่ง)');el.scrollTop=el.scrollHeight}
 function scaleDlg(){const d=document.createElement('dialog');d.style.cssText='max-width:620px;width:96%;border-radius:14px;background:var(--c);color:var(--t)';
  const sel=(id,arr,v)=>`<select id="${id}">${arr.map(x=>`<option${x==v?' selected':''}>${x}</option>`).join('')}</select>`;
  d.innerHTML=`<b style="font-size:20px">⚙ ตั้งค่าตาชั่ง</b><div class="m" style="margin:4px 0 8px">รองรับตาชั่งที่ต่อผ่านสาย RS-232 (พอร์ต DB9/แจ็ค), สาย USB-to-Serial, RS-485 ผ่านตัวแปลง USB หรืออุปกรณ์ USB ที่ขึ้นเป็นพอร์ต COM · ใช้ Chrome/Edge</div>
@@ -304,6 +374,31 @@ function scaleDlg(){const d=document.createElement('dialog');d.style.cssText='ma
  const close=()=>{clearInterval(riv);window._rawEl=null;d.remove()};d.querySelector('.dn').onclick=close;d.oncancel=close;d.querySelector('.det').onclick=()=>{close();scDetect()};d.querySelector('.lt').onclick=scLoopTest;d.querySelector('.cp').onclick=()=>{navigator.clipboard?.writeText(window._rawEl?.textContent||'').then(()=>toast('คัดลอกข้อมูลดิบแล้ว วางในแชตได้เลย'))};d.querySelector('.np2').onclick=async()=>{close();await scClose();scToggle()};
  d.querySelector('.sv').onclick=async()=>{const g=i=>d.querySelector('#'+i);Object.assign(SC,{baud:+g('c1').value,data:+g('c2').value,parity:g('c3').value,stop:+g('c4').value,unit:g('c5').value,pick:g('c6').value,mode:g('c7').value,cmd:g('c8').value,id:g('c12').value.trim()||'ชั่ง 1',auto:g('c9').checked,autoConn:g('c10').checked,dp:+g('c13').value,once:g('c14').checked,sig:g('c15').value,flow:g('c16').value});
   if(adm)SC.lock=g('c11').checked;scSave();close();if(scOn){await scClose();await scAuto(true)}scStatus();toast('บันทึกการตั้งค่าตาชั่งแล้ว')}}
+// ---------- Full-size photo viewer for weighing, bill review, audit and history ----------
+(function setupImageViewer(){
+ if(window.__mkImageViewerReady)return;window.__mkImageViewerReady=true;
+ const box=document.createElement('div');box.id='mk-img-viewer';box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-label','ดูรูปภาพขนาดใหญ่');
+ box.innerHTML='<button type="button" class="mkiv-close" aria-label="ปิดรูป">×</button><div class="mkiv-caption"></div><img alt="รูปหลักฐานขนาดใหญ่">';
+ document.body.appendChild(box);
+ const big=box.querySelector('img'),cap=box.querySelector('.mkiv-caption');
+ function close(){box.classList.remove('show');big.removeAttribute('src');cap.textContent=''}
+ function open(img){const src=img.currentSrc||img.src;if(!src)return;big.src=src;
+   const holder=img.closest('.pth,.ph,#audit,#bdlg,#hist,#admin,#mine,#tklines,.ln-act')||img.parentElement;
+   const label=img.getAttribute('alt')||img.getAttribute('title')||holder?.querySelector('b')?.textContent?.trim()||'รูปหลักฐาน';
+   cap.textContent=label;box.classList.add('show');
+ }
+ document.addEventListener('click',e=>{
+   if(e.target===box||e.target===box.querySelector('.mkiv-close')){close();return}
+   const img=e.target.closest&&e.target.closest('img');if(!img)return;
+   // Limit the viewer to photos used as evidence or previews, not branding/icons.
+   if(!img.matches('.img-view-thumb,.th,.ph img,.pth img,#audit img,#bdlg img,#hist img,#admin img,#mine img,#tklines img,[data-image-review]'))return;
+   e.preventDefault();e.stopPropagation();open(img);
+ },true);
+ document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target instanceof HTMLImageElement&&e.target.matches('.img-view-thumb,.th,.ph img,.pth img,#audit img,#bdlg img,#hist img,#admin img,#mine img,#tklines img,[data-image-review]')){e.preventDefault();open(e.target)}});
+ box.querySelector('.mkiv-close').addEventListener('click',close);
+ box.addEventListener('click',e=>{if(e.target===box)close()});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&box.classList.contains('show'))close()});
+})();
 // ---------- POS ----------
 let curCat=null,CATS=[],editIdx=-1;
 function setCat(i){curCat=CATS[i];renderPos()}
@@ -314,20 +409,20 @@ function renderPos(){CATS=[...new Set(P.map(p=>p.cat))];if(!CATS.includes(curCat
 function pFilter(){const q=($('psq')?.value||'').trim().toLowerCase();return q?P.filter(p=>(p.name+' '+p.code+' '+p.cat).toLowerCase().includes(q)):P.filter(p=>p.cat==curCat)}
 function psEnter(){const r=pFilter();if(r.length){$('psq').value='';renderPos();openW(r[0].id)}}
 function pad(k){if(SC.lock&&scOn)return toast('โหมดล็อกน้ำหนักเปิดอยู่: ใช้ค่าจากตาชั่งเท่านั้น');gsrc='manual';const g=$('gross');let v=g.value;if(k=='C')v='';else if(k=='<')v=v.slice(0,-1);else if(k=='.'){if(!v.includes('.'))v=(v||'0')+'.'}else v+=k;g.value=v;calc()}
-async function openW(id,L){if(SC.lock&&!scOn)return toast('โหมดล็อกน้ำหนักเปิดอยู่: ต้องเชื่อมต่อตาชั่งก่อน');const p=P.find(x=>x.id==id);$('pid').value=id;$('wt').textContent=p.name;$('wp').textContent='฿'+f2(p.price)+'/กก.';
+async function openW(id,L){if(SC.lock&&!scOn)return toast('โหมดล็อกน้ำหนักเปิดอยู่: ต้องเชื่อมต่อตาชั่งก่อน');const p=P.find(x=>x.id==id);if(!p)return toast('ไม่พบสินค้า');$('pid').value=id;$('wt').textContent=p.name;$('wp').textContent='ราคามาตรฐาน ฿'+f2(p.price)+'/กก.';$('unitPrice').value=String(L&&L.price!=null?L.price:p.price);
  wph=[];rPh();gsrc='manual';$('gross').readOnly=SC.lock&&scOn;$('gross').value='';$('tareX').value=0;$('pct').value=0;editIdx=-1;if(L){editIdx=cur.lines.indexOf(L);$('gross').value=L.gross;$('tareSel').value=L.ts??'0';$('tareQ').value=L.tq??1;$('tareX').value=L.tx??L.tare??0;$('pct').value=L.pct||0;wph=[...(L.photos||[])];gsrc=L.src||'manual';rPh()}calc();$('wd').showModal();
  if(!stream)await startCam();if(stream){const v=$('vid');v.srcObject=stream;v.play().catch(()=>{})}}
 // ---------- weigh ----------
 function byCode(){const c=$('code').value.trim().toLowerCase(),p=P.find(x=>x.code.toLowerCase()==c);if(p){$('pid').value=p.id;calc()}}
-function calcLine(){const p=P.find(x=>x.id==$('pid').value);if(!p)return null;const g=+$('gross').value||0,tare=r2((+$('tareSel').value||0)*(+$('tareQ').value||0)+(+$('tareX').value||0)),pct=+$('pct').value||0,
- net=r2(Math.max(0,(g-tare)*(1-pct/100)));return{pid:p.id,code:p.code,name:p.name,price:p.price,gross:g,tare,pct,net,amount:r2(net*p.price)}}
-function calc(){const l=calcLine();$('prev').textContent=l?`หักภาชนะ ${f2(l.tare)} กก. · ฿${(l.price/1000).toFixed(3)}/กรัม`:'';$('rnet').textContent=l?f2(l.net):'0.00';$('ramt').textContent='฿'+(l?f2(l.amount):'0.00')}
-function addLine(){const l=calcLine();if(!l||l.gross<=0||l.net<=0)return toast('กรอกน้ำหนักให้ถูกต้อง');if(l.price<=0)return toast('สินค้านี้ยังไม่ได้ตั้งราคา (ให้แอดมินตั้งราคาก่อน)');if(!wph.length)snap();if(!wph.length)return toast('ต้องมีรูปอย่างน้อย 1 รูป (เปิดกล้องแล้วกดถ่าย)');l.photos=[...wph];l.photo=l.photos[0];l.src=gsrc;l.kind='small';l.ts=$('tareSel').value;l.tq=$('tareQ').value;l.tx=$('tareX').value;if(editIdx>=0&&cur.lines[editIdx])cur.lines[editIdx]=l;else cur.lines.push(l);editIdx=-1;wph=[];rPh();$('gross').value='';$('wd').close();rLines()}
+function calcLine(){const p=P.find(x=>x.id==$('pid').value);if(!p)return null;const g=+$('gross').value||0,tare=r2((+$('tareSel').value||0)*(+$('tareQ').value||0)+(+$('tareX').value||0)),pct=+$('pct').value||0,priceText=$('unitPrice')?.value,price=priceText===''?NaN:+priceText,
+ net=r2(Math.max(0,(g-tare)*(1-pct/100)));return{pid:p.id,code:p.code,name:p.name,price,gross:g,tare,pct,net,amount:r2(net*price)}}
+function calc(){const l=calcLine();$('prev').textContent=l?`หักภาชนะ ${f2(l.tare)} กก. · ราคา ${f2(l.price)} บาท/กก. (฿${(l.price/1000).toFixed(3)}/กรัม)`:'';$('rnet').textContent=l?f2(l.net):'0.00';$('ramt').textContent='฿'+(l&&Number.isFinite(l.price)?f2(l.amount):'0.00')}
+function addLine(){const l=calcLine();if(!l||l.gross<=0||l.net<=0)return toast('กรอกน้ำหนักให้ถูกต้อง');if(!Number.isFinite(l.price)||l.price<0)return toast('กรอกราคา/กก. ให้ถูกต้อง');if(l.price<=0)return toast('ราคาต่อกิโลต้องมากกว่า 0');if(!wph.length)snap();if(!wph.length)return toast('ต้องมีรูปอย่างน้อย 1 รูป (เปิดกล้องแล้วกดถ่าย)');l.photos=[...wph];l.photo=l.photos[0];l.src=gsrc;l.kind='small';l.ts=$('tareSel').value;l.tq=$('tareQ').value;l.tx=$('tareX').value;if(editIdx>=0&&cur.lines[editIdx])cur.lines[editIdx]=l;else cur.lines.push(l);editIdx=-1;wph=[];rPh();$('gross').value='';$('wd').close();rLines()}
 const TRASH=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>`;
 function lineHtml(l,i){const tr=l.kind=='truck',w=tr&&l.net==null,th=phUrl(tr?l.ph:(l.photos?.[0]||l.photo));
  const info=tr?(w?`รถหนัก ${f2(l.heavy)} กก. · <b style="color:#dc2626">รอชั่งรถเบา</b>`:`รถหนัก ${f2(l.heavy)} − รถเบา ${f2(l.light)}${l.deduct?' − หัก '+f2(l.deduct):''} = <b>${f2(l.net)}</b> กก.`):`รวม ${f2(l.gross)} · หัก ${f2(l.tare)}${l.pct?' · เจือปน '+l.pct+'%':''} = <b>${f2(l.net)}</b> กก.`;
  return `<div class="ln"${w?' style="background:#fde8e8;border-radius:8px;padding-left:6px"':''}><div><div class="ln-name">${i+1}. ${esc(l.name)}<span class="pchip">${tr?'🚚':'⚖'} ฿${f2(l.price)}/กก.</span></div><div class="m">${info}</div></div>
- <div class="ln-side"><b>${w?'—':'฿'+f2(l.amount)}</b><div class="ln-act">${w?`<button class="bt-blue" style="min-height:36px;padding:0 10px" onclick="truckLight(${i})">⚖ รถเบา</button>`:''}${th?`<img class="th" src="${th}">`:''}<button class="ic ed" aria-label="แก้ไข" onclick="editLine(${i})">✏️</button><button class="ic del" aria-label="ลบรายการ" onclick="delLine(${i})">${TRASH}</button></div></div></div>`}
+ <div class="ln-side"><b>${w?'—':'฿'+f2(l.amount)}</b><div class="ln-act">${w?`<button class="bt-blue" style="min-height:36px;padding:0 10px" onclick="truckLight(${i})">⚖ รถเบา</button>`:''}${th?`<img class="th img-view-thumb" src="${th}" alt="รูปหลักฐานสินค้า ${esc(l.name)}" title="กดเพื่อดูรูปใหญ่" tabindex="0">`:''}<button class="ic ed" aria-label="แก้ไข" onclick="editLine(${i})">✏️</button><button class="ic del" aria-label="ลบรายการ" onclick="delLine(${i})">${TRASH}</button></div></div></div>`}
 function rLines(){$('bmeta').textContent=new Date().toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'})+' · ผู้ชั่ง: '+(ME?.name||'')+' · '+SC.id;
  const dn=cur.lines.filter(l=>l.net!=null),t=dn.reduce((a,l)=>a+l.amount,0),n=dn.reduce((a,l)=>a+l.net,0),pd=cur.lines.length-dn.length,H=cur.lines.map(lineHtml).join('');
  $('lines').innerHTML=H||'<div class="m" style="text-align:center;padding:24px 0">กดสินค้าทางซ้ายเพื่อเริ่มชั่ง</div>';const tk=$('tklines');if(tk)tk.innerHTML=H||'<div class="m" style="text-align:center;padding:24px 0">กด "เพิ่มสินค้า (ชั่งรถหนัก)" เพื่อเริ่ม</div>';
@@ -385,7 +480,7 @@ async function showBill(id){const b=B.find(x=>x.id==id)||HB.find(x=>x.id==id);le
  document.body.appendChild(d);d.showModal();
  const{data:ph}=await sb.from('bill_photos').select('path').eq('bill_id',id),box=d.querySelector('#dph');
  if(!ph?.length){box.innerHTML='<span class="m">ไม่มีรูป</span>';return}
- const{data:u}=await sb.storage.from('bill-photos').createSignedUrls(ph.map(x=>x.path),3600);box.innerHTML=(u||[]).map(x=>`<img src="${x.signedUrl}" style="height:110px">`).join('')}
+ const{data:u}=await sb.storage.from('bill-photos').createSignedUrls(ph.map(x=>x.path),3600);box.innerHTML=(u||[]).map(x=>`<img class="img-view-thumb" src="${x.signedUrl}" style="height:110px;cursor:zoom-in" alt="รูปหลักฐานในบิล" title="กดเพื่อดูรูปใหญ่" tabindex="0">`).join('')}
 async function setSt(id,st){const{error}=await sb.rpc('approve_bill',{p_id:id,p_status:st});
  if(error){await loadB();rAdmin();return toast('ไม่สำเร็จ: '+(/approve_bill/.test(error.message)&&/function|schema cache/i.test(error.message)?'ยังไม่ได้ Run migrate9.sql ใน Supabase':error.message),9000)}
  document.getElementById('bdlg')?.remove();await loadB();rAdmin();toast(st=='approved'?'✅ จ่ายเงินแล้ว — ดูได้ที่ "ประวัติ/ยกเลิก > จ่ายแล้ว"':'ปฏิเสธบิลแล้ว',5000)}
@@ -511,7 +606,7 @@ async function rAudit(){const el=$('audit'),d=el.dataset.d||new Date().toISOStri
  el.innerHTML=`<div class="card row"><div><label>วันที่</label><input type="date" value="${d}" onchange="$('audit').dataset.d=this.value;rAudit()"></div><div><b>${bs.length}</b> บิล · ฿${f2(tot)}</div><div>รอตรวจรูป <b>${un}</b> · พบผิดปกติ <b style="color:var(--d)">${fl}</b></div></div><div class="m" style="margin:-4px 0 8px">ตรวจรูปเทียบกับสินค้าที่เลือก (แยกจากการจ่ายเงิน) — ตรงกันกด ✅ ผิดปกติกด ⚠️</div>`+
  bs.map(b=>`<div class="card"><b>${b.no}</b> <span class="bd ${b.status}">${b.status=='pending'?'รอจ่าย':'จ่ายแล้ว'}</span> ${b.audit=='ok'?'✅ ตรวจแล้ว':b.audit=='flagged'?'⚠️ พบผิดปกติ: '+esc(b.anote):''}
  <div class="m">${esc(b.seller)} · เสมียน ${esc(b.recorder)} · เครื่อง ${esc(b.scale||'-')} · ${new Date(b.ts).toLocaleTimeString('th-TH')}</div>
- <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin:8px 0">${ph.filter(x=>x.bill_id==b.id).map(x=>`<div><img src="${U[x.path]}" style="width:100%;border-radius:8px;cursor:pointer" onclick="window.open(this.src)"><div style="font-size:13px"><b>${x.product_name?'ที่เลือก: '+esc(x.product_name):'รูปเพิ่มเติม'}</b></div></div>`).join('')||'<span class="m">⚠️ ไม่มีรูปในบิลนี้</span>'}</div>
+ <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin:8px 0">${ph.filter(x=>x.bill_id==b.id).map(x=>`<div><img class="img-view-thumb" src="${U[x.path]}" style="width:100%;border-radius:8px;cursor:zoom-in" alt="รูปหลักฐาน ${esc(x.product_name||'')}" title="กดเพื่อดูรูปใหญ่" tabindex="0"><div style="font-size:13px"><b>${x.product_name?'ที่เลือก: '+esc(x.product_name):'รูปเพิ่มเติม'}</b></div></div>`).join('')||'<span class="m">⚠️ ไม่มีรูปในบิลนี้</span>'}</div>
  <table>${b.lines.map(l=>`<tr><td>${esc(l.name)} ${l.src=='scale'?'<span class="bd approved">⚖ ตาชั่ง</span>':l.src=='manual'?'<span class="bd pending">✍ พิมพ์เอง</span>':''}</td><td class="n">สุทธิ ${f2(l.net)} กก.</td><td class="n">฿${f2(l.amount)}</td></tr>`).join('')}</table><div class="tot">฿${f2(b.total)}</div>
  <div class="row"><button onclick="setAudit('${b.id}','ok')">✅ ตรงกัน</button><button onclick="setAudit('${b.id}','flagged')">⚠️ ผิดปกติ</button><button class="dan" onclick="voidBill('${b.id}')">ยกเลิกบิล</button></div></div>`).join('')||'<div class="m">ไม่มีบิลในวันนี้</div>'}
 async function setAudit(id,v){let note=null;if(v=='flagged'){note=await dlg('ระบุเหตุผลที่สงสัย (เช่น รูปเป็นทองเหลือง แต่เลือกทองแดง)',{input:true,ok:'บันทึก'});if(note===null)return}
