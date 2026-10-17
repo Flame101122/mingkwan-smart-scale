@@ -1133,22 +1133,120 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 </script>
 
 <script>
-// ===== r16 add-on (silent): พักบิลได้เสมอ แม้ Storage ยังไม่อนุญาตโฟลเดอร์ hold/ =====
-// ปกติอัปโหลดรูปบิลที่พักไป Storage เหมือนเดิม ถ้าไม่ได้จะเก็บรูปไว้กับตัวบิลที่พัก (data URL) เงียบ ๆ
-// ตอนกด "บันทึก / ส่งจ่าย" saveBill เดิมจะอัปโหลดรูปเข้าโฟลเดอร์ของบิลจริงให้เอง
+// ===== r18 รวม: พักบิลเงียบ + แก้ปุ่มจุดหน้าชั่ง + ใบรับแบบจัดกลุ่มสินค้า/สรุปท้ายกลุ่ม/โลโก้ KHW =====
 (function(){
- if(window.__mk16)return;window.__mk16=1;
- const up0=window.upPhoto;if(typeof up0!='function')return;
- let holdOff=false,lastTry=0;
- window.upPhoto=async function(d,path){
-  if(!String(path).startsWith('hold/'))return up0.apply(this,arguments);   // บิลปกติ: เหมือนเดิม 100%
-  // เคยพลาดแล้ว: ข้ามไปเก็บในบิลเลย แต่ลองกลับไปใช้ Storage ใหม่ทุก 5 นาที (เผื่อแอดมินรัน SQL แล้ว)
-  if(holdOff&&Date.now()-lastTry<300000)return d;
-  try{const r=await up0.apply(this,arguments);holdOff=false;return r}
-  catch(e){holdOff=true;lastTry=Date.now();
-   console.warn('[hold] Storage ปฏิเสธ hold/ → เก็บรูปไว้กับบิลที่พักแทน (ให้แอดมิน Run fix_hold_rls.sql):',e&&e.message||e);
-   return d}
- };
+ if(window.__mk18)return;window.__mk18=1;
+
+ // ---------- A) พักบิล: อัปโหลดรูป hold/ ไม่ได้ ให้เก็บรูปไว้กับบิลที่พักเงียบ ๆ ----------
+ const up0=window.upPhoto;
+ if(typeof up0=='function'){
+  let holdOff=false,lastTry=0;
+  window.upPhoto=async function(d,path){
+   if(!String(path).startsWith('hold/'))return up0.apply(this,arguments);
+   if(holdOff&&Date.now()-lastTry<300000)return d;
+   try{const r=await up0.apply(this,arguments);holdOff=false;return r}
+   catch(e){holdOff=true;lastTry=Date.now();
+    console.warn('[hold] Storage ปฏิเสธ hold/ → เก็บรูปไว้กับบิลที่พักแทน (ให้แอดมิน Run fix_hold_rls.sql):',e&&e.message||e);
+    return d}
+  };
+ }
+
+ // ---------- B) ปุ่มตัวเลขหน้าชั่ง: กด "." แล้วค่าไม่หาย ----------
+ const g=document.getElementById('gross');
+ if(g){
+  g.type='text';
+  g.setAttribute('inputmode','none');
+  g.setAttribute('autocomplete','off');
+  g.addEventListener('input',()=>{
+   let s=g.value.replace(/[^\d.]/g,'');const i=s.indexOf('.');
+   if(i>=0)s=s.slice(0,i+1)+s.slice(i+1).replace(/\./g,'');
+   if(s!==g.value){g.value=s;if(typeof calc=='function')calc()}
+  });
+ }
+ function fixPad(){const n=document.getElementById('npad');if(!n)return;
+  n.querySelectorAll('button').forEach(b=>{const t=b.textContent.trim();
+   if(t==='.'){b.style.fontSize='36px';b.style.fontWeight='900'}
+   else if(t.charAt(0)==='\u232B')b.textContent='\u232B\uFE0E'})}
+ const rp0=window.renderPos;
+ if(typeof rp0=='function')window.renderPos=function(){const r=rp0.apply(this,arguments);fixPad();return r};
+ fixPad();
+
+ // ---------- C) ใบรับ ----------
+ const DOT=/(\d)\.(\d)/g;
+ const dec=s=>String(s).replace(DOT,'$1<span class="dp">.</span>$2');
+
+ // C1) พิมพ์ผ่านเบราว์เซอร์ (จุดทศนิยมใหญ่และหนา)
+ window.rcHtml=function(rc){const w=PR.w==58?46:70,rows=rcRows(rc).map(r=>{if(r.k=='hr')return '<hr>';if(r.k=='sp')return '<div style="height:10px"></div>';const st=(r.bold?'font-weight:700;':'')+(r.big?'font-size:15px;':'')+(r.small?'font-size:10.5px;':'');
+  if(r.k=='c')return `<div style="text-align:center;${st}">${dec(esc(r.a))}</div>`;if(r.k=='lr')return `<div style="display:flex;justify-content:space-between;gap:6px;${st}"><span>${dec(esc(r.a))}</span><span style="white-space:nowrap">${dec(esc(r.b))}</span></div>`;return `<div style="${st}">${dec(esc(r.a))}</div>`}).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700;900&display=swap" rel="stylesheet"><style>@page{size:${PR.w}mm auto;margin:0}html,body{margin:0}body{padding:2mm 3mm;width:${w}mm;font:12px/1.4 Prompt,sans-serif;color:#000}hr{border:0;border-top:1px dashed #000;margin:4px 0}.dp{font-weight:900;font-size:1.6em;line-height:0;padding:0 .06em;-webkit-text-stroke:.4px #000}</style></head><body>${rows}</body></html>`};
+
+ // C2) พิมพ์ ESC/POS (ภาพ) วาดจุดทศนิยมเป็นวงกลมทึบ
+ const dw=(c,fsz)=>Math.round(fsz*.34);
+ function tw(c,t,fsz){let w=0,last=0,m;const re=/(\d)\.(\d)/g;
+  while((m=re.exec(t))){const i=m.index+1;w+=c.measureText(t.slice(last,i)).width+dw(c,fsz);last=i+1;re.lastIndex=i+1}
+  return w+c.measureText(t.slice(last)).width}
+ function dt(c,t,x,y,align,fsz){const W=tw(c,t,fsz);let cx=align=='right'?x-W:align=='center'?x-W/2:x;const re=/(\d)\.(\d)/g;let last=0,m;c.textAlign='left';
+  const dp=c.measureText('0').actualBoundingBoxDescent||fsz*.8,r=Math.max(2,Math.round(fsz*.13));
+  while((m=re.exec(t))){const i=m.index+1,seg=t.slice(last,i);c.fillText(seg,cx,y);cx+=c.measureText(seg).width;
+   c.beginPath();c.arc(cx+dw(c,fsz)/2,y+dp-r-1,r,0,7);c.fill();cx+=dw(c,fsz);last=i+1;re.lastIndex=i+1}
+  c.fillText(t.slice(last),cx,y)}
+ window.rcCanvas=async function(rc){const W=PR.w==58?384:576,fs=PR.w==58?21:25,pad=6;try{await document.fonts.load('700 '+fs+'px Prompt');await document.fonts.load('400 '+fs+'px Prompt')}catch(e){}
+  const m=document.createElement('canvas').getContext('2d'),sz=r=>Math.round(fs*(r.big?1.25:r.small?.82:1)),fnt=r=>(r.bold?'700 ':'400 ')+sz(r)+'px Prompt,sans-serif',out=[];
+  for(const r of rcRows(rc)){if(r.k=='hr'){out.push({h:12,d:(c,y)=>c.fillRect(pad,y+5,W-2*pad,2)});continue}if(r.k=='sp'){out.push({h:Math.round(fs*.7),d:()=>{}});continue}
+   m.font=fnt(r);const lh=Math.round(sz(r)*1.4),f=sz(r),px={measureText:s=>({width:tw(m,s,f)})};
+   if(r.k=='lr'){const bw=tw(m,r.b,f);out.push({h:lh,d:(c,y)=>{c.font=fnt(r);c.textBaseline='top';let a=r.a;while(a&&tw(c,a,f)>W-2*pad-bw-10)a=a.slice(0,-1);dt(c,a,pad,y,'left',f);dt(c,r.b,W-pad,y,'right',f)}});continue}
+   for(const t of wrapT(px,r.a,W-2*pad))out.push({h:lh,d:(c,y)=>{c.font=fnt(r);c.textBaseline='top';dt(c,t,r.k=='c'?W/2:pad,y,r.k=='c'?'center':'left',f)}})}
+  const H=out.reduce((a,x)=>a+x.h,0)+24,cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W,H);c.fillStyle='#000';let y=8;for(const x of out){x.d(c,y);y+=x.h}return cv};
+
+ // C3) เนื้อหาใบรับ: รวมสินค้าชื่อเดียวกันเป็นกลุ่ม + สรุปท้ายกลุ่ม (จากไฟล์ใหม่)
+ const SUM_SINGLE=false; // true = แสดงสรุปท้ายกลุ่มแม้สินค้านั้นชั่งครั้งเดียว
+ window.rcRows=function(rc){
+  const R=[],t=new Date(rc.ts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'});
+  R.push({k:'c',a:rc.shop,bold:1,big:1},{k:'c',a:rc.title},{k:'l',a:'เลขที่ '+rc.no},{k:'l',a:'วันที่ '+t},{k:'l',a:'ผู้ขาย: '+rc.seller},{k:'l',a:'ผู้ชั่ง: '+rc.weigher+' ('+rc.scale+')'});
+  if(rc.note)R.push({k:'l',a:rc.note});
+  R.push({k:'hr'});
+  const G=new Map();
+  rc.lines.forEach(l=>{if(!G.has(l.name))G.set(l.name,[]);G.get(l.name).push(l)});
+  G.forEach((ls,name)=>{
+   R.push({k:'l',a:name,bold:1});
+   ls.forEach((l,i)=>{
+    const n=ls.length>1?(i+1)+') ':'';
+    if(l.pending){R.push({k:'l',a:'  '+n+'รถหนัก '+f2(l.heavy)+' กก. (รอชั่งรถเบา)',small:1});return}
+    R.push({k:'lr',a:'  '+n+f2(l.net)+' กก. x '+f2(l.price),b:f2(l.amount)});
+    R.push({k:'l',a:l.truck?'  (รถหนัก '+f2(l.heavy)+' - รถเบา '+f2(l.light)+(l.tare?' - หัก '+f2(l.tare):'')+')':'  (รวม '+f2(l.gross)+' หัก '+f2(l.tare)+(l.pct?' เจือปน '+l.pct+'%':'')+')',small:1});
+   });
+   const done=ls.filter(l=>!l.pending);
+   if(done.length>1||(SUM_SINGLE&&done.length)){
+    const net=r2(done.reduce((a,l)=>a+(+l.net||0),0)),tare=r2(done.reduce((a,l)=>a+(+l.tare||0),0)),amt=r2(done.reduce((a,l)=>a+(+l.amount||0),0));
+    R.push({k:'lr',a:'  รวม '+done.length+' ครั้ง น้ำหนักสุทธิ',b:f2(net)+' กก.',bold:1},
+           {k:'lr',a:'  ภาชนะ/หักรวม',b:f2(tare)+' กก.',small:1},
+           {k:'lr',a:'  ยอดรวม '+name,b:f2(amt),bold:1});
+   }
+  });
+  R.push({k:'hr'},{k:'lr',a:'รวมสุทธิ',b:f2(rc.total)+' บาท',bold:1,big:1},{k:'sp'},{k:'l',a:'ลงชื่อผู้ขาย ______________'},{k:'sp'},{k:'c',a:'ขอบคุณที่ใช้บริการ',small:1});
+  return R};
+
+ // C4) โลโก้ KHW: พิมพ์ผ่านเบราว์เซอร์ (K,H ดำ / W เทาเข้ม)
+ const html0=window.rcHtml;
+ window.rcHtml=function(rc){
+  const logo='<div style="text-align:center;font:900 34px/1 Prompt,sans-serif;letter-spacing:3px;margin:0 0 3px;-webkit-print-color-adjust:exact;print-color-adjust:exact"><span style="color:#000">KH</span><span style="color:#555;-webkit-text-stroke:.5px #333">W</span></div>';
+  return html0(rc).replace('<body>','<body>'+logo)};
+
+ // C5) โลโก้ KHW: ESC/POS (W ใช้ลายจุดสลับให้ดูเป็นเทา)
+ const cv0=window.rcCanvas;
+ window.rcCanvas=async function(rc){
+  const cv=await cv0(rc),W=cv.width,fs=W==384?54:66,LH=Math.round(fs*1.3);
+  try{await document.fonts.load('900 '+fs+'px Prompt')}catch(e){}
+  const o=document.createElement('canvas');o.width=W;o.height=cv.height+LH;const c=o.getContext('2d');
+  c.fillStyle='#fff';c.fillRect(0,0,W,o.height);
+  c.font='900 '+fs+'px Prompt,sans-serif';c.textBaseline='top';c.textAlign='left';
+  const gap=Math.round(fs*.1),L=['K','H','W'],w=L.map(ch=>c.measureText(ch).width);
+  let x=(W-(w[0]+w[1]+w[2]+gap*2))/2;const y=4;
+  c.fillStyle='#000';c.fillText('K',x,y);x+=w[0]+gap;c.fillText('H',x,y);x+=w[1]+gap;
+  const p=document.createElement('canvas');p.width=p.height=2;const pc=p.getContext('2d');pc.fillStyle='#000';pc.fillRect(0,0,1,1);pc.fillRect(1,1,1,1);
+  c.fillStyle=c.createPattern(p,'repeat');c.fillText('W',x,y);
+  c.strokeStyle='#000';c.lineWidth=Math.max(2,fs*.04);c.lineJoin='round';c.strokeText('W',x,y);
+  c.drawImage(cv,0,LH);return o};
 })();
 </script>
 
