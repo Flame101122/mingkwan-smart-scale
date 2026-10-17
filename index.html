@@ -1133,16 +1133,22 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 </script>
 
 <script>
-// ===== r15 add-on: แจ้งสาเหตุ "พักบิลไม่สำเร็จ" ให้ชัด (ไม่เปลี่ยนวิธีทำงานเดิม) =====
+// ===== r16 add-on (silent): พักบิลได้เสมอ แม้ Storage ยังไม่อนุญาตโฟลเดอร์ hold/ =====
+// ปกติอัปโหลดรูปบิลที่พักไป Storage เหมือนเดิม ถ้าไม่ได้จะเก็บรูปไว้กับตัวบิลที่พัก (data URL) เงียบ ๆ
+// ตอนกด "บันทึก / ส่งจ่าย" saveBill เดิมจะอัปโหลดรูปเข้าโฟลเดอร์ของบิลจริงให้เอง
 (function(){
- if(window.__mk15)return;window.__mk15=1;
- const up0=window.upPhoto;
- if(typeof up0=='function')window.upPhoto=async function(d,path){
-  try{return await up0.apply(this,arguments)}
-  catch(e){const m=String(e&&e.message||e);
-   if(String(path).startsWith('hold/')&&/row-level security|policy|not authorized|unauthorized|403/i.test(m))
-    throw new Error('อัปโหลดรูปของบิลที่พักไม่ได้ — ที่เก็บรูป (Storage) ยังไม่อนุญาตโฟลเดอร์ hold/ → ให้แอดมิน Run ไฟล์ fix_hold_rls.sql ใน Supabase ('+m+')');
-   throw e}};
+ if(window.__mk16)return;window.__mk16=1;
+ const up0=window.upPhoto;if(typeof up0!='function')return;
+ let holdOff=false,lastTry=0;
+ window.upPhoto=async function(d,path){
+  if(!String(path).startsWith('hold/'))return up0.apply(this,arguments);   // บิลปกติ: เหมือนเดิม 100%
+  // เคยพลาดแล้ว: ข้ามไปเก็บในบิลเลย แต่ลองกลับไปใช้ Storage ใหม่ทุก 5 นาที (เผื่อแอดมินรัน SQL แล้ว)
+  if(holdOff&&Date.now()-lastTry<300000)return d;
+  try{const r=await up0.apply(this,arguments);holdOff=false;return r}
+  catch(e){holdOff=true;lastTry=Date.now();
+   console.warn('[hold] Storage ปฏิเสธ hold/ → เก็บรูปไว้กับบิลที่พักแทน (ให้แอดมิน Run fix_hold_rls.sql):',e&&e.message||e);
+   return d}
+ };
 })();
 </script>
 
