@@ -143,7 +143,7 @@ function dlg(title,{input=false,ok='ตกลง',danger=false,no='ยกเล�
  d.innerHTML=`<b>${esc(title)}</b>${body}${input?`<textarea id="di" rows="3" style="margin-top:8px" placeholder="${esc(ph)}">${esc(init)}</textarea>`:''}<div class="row" style="margin-top:10px"><button id="dn">${no}</button><button id="dk" class="${danger?'dan':'pri'}">${ok}</button></div>`;
  document.body.appendChild(d);d.showModal();const done=v=>{d.remove();r(v)};d.oncancel=()=>done(null);d.querySelector('#dn').onclick=()=>done(null);
  d.querySelector('#dk').onclick=()=>{const v=input?d.querySelector('#di').value.trim():true;if(input&&!v)return d.querySelector('#di').focus();done(v)}})}
-const BUILD='2026-10-17 r15';console.log('Mingkwan build',BUILD);
+const BUILD='2026-10-17 r20';console.log('Mingkwan build',BUILD);
 const sb=supabase.createClient('https://sunifccylaokivalwjic.supabase.co','sb_publishable_mNYJioB49fgTQZZzQq3zgg_QpA0fu2n',{global:{fetch:(u,o)=>fetch(u,{...o,cache:'no-store'})}});
 let ME=null,T=[],saving=false;const TABS={clerk:['weigh','truck','dash','mine'],cashier:['dash','admin','hist','stock','rep'],admin:['weigh','truck','dash','admin','hist','staff','audit','stock','rep','prod','set']},RL={clerk:'User — พนักงานชั่ง',cashier:'ผู้จ่ายเงิน/บัญชี',admin:'Admin'},can=t=>TABS[ME?.role]?.includes(t),FRONT=['weigh','truck','dash','mine'],TC={weigh:'#22c55e',truck:'#0ea5e9',dash:'#818cf8',mine:'#2dd4bf',admin:'#f59e0b',hist:'#a78bfa',audit:'#f472b6',stock:'#fb923c',rep:'#60a5fa',prod:'#a3e635',set:'#94a3b8',staff:'#e879f9'};
 let S={shop:'Mingkwan Smart Scale',recorder:'พนักงาน 1',pin:'1234',tares:'ตะกร้าเล็ก:1.2,ตะกร้าใหญ่:2.5,กระสอบ:0.3',unit:'kg'};
@@ -1247,6 +1247,79 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
   c.fillStyle=c.createPattern(p,'repeat');c.fillText('W',x,y);
   c.strokeStyle='#000';c.lineWidth=Math.max(2,fs*.04);c.lineJoin='round';c.strokeText('W',x,y);
   c.drawImage(cv,0,LH);return o};
+})();
+</script>
+
+<script>
+// ===== r20 add-on: ตัวดูรูป เลื่อนดูหลายรูปได้ (ปัดซ้าย-ขวาบนมือถือ / ลูกศร ◀ ▶ และปุ่มคีย์บอร์ดบนคอม) =====
+// ต่อยอดตัวดูรูปเดิม (#mk-img-viewer) โดยไม่แก้โค้ดเดิม: ตอนเปิดรูป จะรวมรูปอื่นในกลุ่มเดียวกัน (เช่น รูปของบิลเดียวกัน) ให้เลื่อนดูต่อได้
+(function(){
+ if(window.__mk20)return;window.__mk20=1;
+ const box=document.getElementById('mk-img-viewer');if(!box)return;
+ const big=box.querySelector('img'),cap=box.querySelector('.mkiv-caption');if(!big||!cap)return;
+ const SEL='.img-view-thumb,.th,.ph img,.pth img,#audit img,#bdlg img,#hist img,#admin img,#mine img,#tklines img,[data-image-review]';
+ const mk=(tag,cls,html,attrs)=>{const e=document.createElement(tag);e.className=cls;if(html)e.innerHTML=html;for(const k in(attrs||{}))e.setAttribute(k,attrs[k]);return e};
+ const prev=mk('button','mkiv-nav prev','&#8249;',{type:'button','aria-label':'รูปก่อนหน้า'}),next=mk('button','mkiv-nav next','&#8250;',{type:'button','aria-label':'รูปถัดไป'}),
+  dots=mk('div','mkiv-dots'),count=mk('div','mkiv-count');
+ box.append(prev,next,dots,count);
+ let G=[],idx=0,last=null,busy=false;
+ const srcOf=i=>G[i].currentSrc||G[i].src,label=i=>G[i].getAttribute('alt')||G[i].getAttribute('title')||'รูปหลักฐาน';
+ // รวมรูปกลุ่มเดียวกัน: ไล่ขึ้นไปไม่เกิน 3 ชั้น หาที่ครอบรูป >= 2 รูป (กันไม่ให้ไปรวมรูปของบิลอื่น)
+ function gather(img){let el=img.parentElement,h=0;
+  while(el&&h<3&&el!==document.body){const L=[...el.querySelectorAll('img')].filter(i=>i!==big&&!box.contains(i)&&i.matches(SEL)&&(i.currentSrc||i.src));
+   if(L.length>=2&&L.includes(img))return L;el=el.parentElement;h++}
+  return[img]}
+ function render(){const n=G.length;box.classList.toggle('mk-multi',n>1);count.textContent=(idx+1)+' / '+n;prev.disabled=idx<=0;next.disabled=idx>=n-1;
+  dots.innerHTML=n>1&&n<=12?G.map((_,i)=>'<i class="'+(i==idx?'on':'')+'" data-i="'+i+'"></i>').join(''):''}
+ function preload(){[idx-1,idx+1].forEach(i=>{if(G[i]){const im=new Image();im.src=srcOf(i)}})}
+ function init(){if(!box.classList.contains('show')||!last)return;G=gather(last);idx=Math.max(0,G.indexOf(last));busy=false;
+  big.style.transition='';big.style.transform='';big.style.opacity='';render();preload()}
+ function go(to){if(busy||to<0||to>=G.length||to===idx)return;const dir=to>idx?1:-1;busy=true;idx=to;render();
+  big.style.transition='transform .15s ease,opacity .15s ease';big.style.transform='translateX('+(-dir*70)+'px)';big.style.opacity='0';
+  setTimeout(()=>{let fin=false;const finish=()=>{if(fin)return;fin=true;big.onload=big.onerror=null;
+    big.style.transition='none';big.style.transform='translateX('+(dir*70)+'px)';void big.offsetWidth;
+    big.style.transition='transform .2s ease,opacity .2s ease';big.style.transform='';big.style.opacity='';setTimeout(()=>{busy=false},210);preload()};
+   big.onload=big.onerror=finish;big.src=srcOf(idx);cap.textContent=label(idx);setTimeout(finish,800)},150)}
+ prev.addEventListener('click',e=>{e.stopPropagation();go(idx-1)});next.addEventListener('click',e=>{e.stopPropagation();go(idx+1)});
+ dots.addEventListener('click',e=>{const i=e.target.dataset&&e.target.dataset.i;if(i!=null){e.stopPropagation();go(+i)}});
+ // เปิดรูป: จำรูปที่กด แล้วสร้างกลุ่มหลังตัวดูรูปเดิมเปิดเสร็จ
+ document.addEventListener('click',e=>{const t=e.target;if(!(t instanceof Element))return;
+  if(box.contains(t)){if(t===big)setTimeout(()=>{if(G.length)cap.textContent=label(idx)},0);return}
+  const img=t.closest('img');if(!img||!img.matches(SEL))return;last=img;setTimeout(init,0)},true);
+ document.addEventListener('keydown',e=>{
+  if(box.classList.contains('show')){if(e.key==='ArrowRight'){e.preventDefault();go(idx+1)}else if(e.key==='ArrowLeft'){e.preventDefault();go(idx-1)}return}
+  if((e.key==='Enter'||e.key===' ')&&e.target instanceof HTMLImageElement&&e.target.matches(SEL)){last=e.target;setTimeout(init,0)}},true);
+ // ปัดนิ้วซ้าย-ขวา (มือถือ/แท็บเล็ต iOS + Android)
+ let sx=0,sy=0,dx=0,track=false,horiz=false;
+ box.addEventListener('touchstart',e=>{if(e.touches.length!==1||G.length<2||busy||e.target.closest('button,.mkiv-dots')){track=false;return}
+  track=true;horiz=false;dx=0;sx=e.touches[0].clientX;sy=e.touches[0].clientY},{passive:true});
+ box.addEventListener('touchmove',e=>{if(!track)return;if(e.touches.length!==1){track=false;return}
+  const x=e.touches[0].clientX-sx,y=e.touches[0].clientY-sy;
+  if(!horiz){if(Math.abs(x)>10&&Math.abs(x)>Math.abs(y)*1.2)horiz=true;else if(Math.abs(y)>14){track=false;return}else return}
+  dx=x;const edge=(dx>0&&idx===0)||(dx<0&&idx===G.length-1);big.style.transition='none';big.style.transform='translateX('+(edge?dx*.3:dx)+'px)'},{passive:true});
+ const end=()=>{if(!track)return;track=false;
+  if(horiz&&Math.abs(dx)>55){const to=dx<0?idx+1:idx-1;if(to>=0&&to<G.length){go(to);return}}
+  big.style.transition='transform .2s ease';big.style.transform=''};
+ box.addEventListener('touchend',end);box.addEventListener('touchcancel',end);
+ // ปิดตัวดูรูป: ล้างสถานะ
+ new MutationObserver(()=>{if(box.classList.contains('show'))return;if(!(G.length||last||box.classList.contains('mk-multi')))return; // ทำครั้งเดียวต่อการปิด (กันวนซ้ำ)
+  G=[];idx=0;last=null;busy=false;box.classList.remove('mk-multi');big.style.transition='';big.style.transform='';big.style.opacity='';big.onload=big.onerror=null}).observe(box,{attributes:true,attributeFilter:['class']});
+ const css=document.createElement('style');css.textContent=`
+ #mk-img-viewer{touch-action:pan-y;overscroll-behavior:contain}
+ #mk-img-viewer .mkiv-nav{position:absolute;top:50%;margin-top:-27px;width:54px;height:54px;border-radius:50%;border:1px solid #ffffff40;background:rgba(255,255,255,.16);color:#fff;font-size:38px;line-height:1;display:none;align-items:center;justify-content:center;padding:0 0 5px;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 2px 14px #0007;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background .15s,opacity .15s,transform .15s;z-index:2}
+ #mk-img-viewer.mk-multi .mkiv-nav{display:flex}
+ #mk-img-viewer .mkiv-nav:hover:not(:disabled){background:rgba(255,255,255,.34)}#mk-img-viewer .mkiv-nav:active:not(:disabled){transform:scale(.92)}
+ #mk-img-viewer .mkiv-nav:disabled{opacity:.22;cursor:default}
+ #mk-img-viewer .mkiv-nav.prev{left:16px}#mk-img-viewer .mkiv-nav.next{right:16px}
+ #mk-img-viewer .mkiv-count{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));display:none;background:rgba(0,0,0,.6);color:#fff;border-radius:99px;padding:5px 16px;font-size:15px;font-weight:700;letter-spacing:.5px;z-index:2}
+ #mk-img-viewer .mkiv-dots{position:absolute;left:0;right:0;bottom:calc(62px + env(safe-area-inset-bottom));display:none;justify-content:center;gap:10px;z-index:2}
+ #mk-img-viewer.mk-multi .mkiv-count{display:block}#mk-img-viewer.mk-multi .mkiv-dots{display:flex}
+ #mk-img-viewer .mkiv-dots i{position:relative;width:9px;height:9px;border-radius:50%;background:#ffffff66;cursor:pointer;transition:transform .15s,background .15s}
+ #mk-img-viewer .mkiv-dots i::after{content:'';position:absolute;inset:-9px}#mk-img-viewer .mkiv-dots i.on{background:#fff;transform:scale(1.35)}
+ #mk-img-viewer.mk-multi{padding-bottom:104px}
+ #mk-img-viewer.mk-multi img{max-height:calc(100vh - 176px);max-height:calc(100dvh - 176px)}
+ @media(max-width:600px){#mk-img-viewer .mkiv-nav{width:44px;height:44px;margin-top:-22px;font-size:32px;background:rgba(0,0,0,.4)}#mk-img-viewer .mkiv-nav.prev{left:6px}#mk-img-viewer .mkiv-nav.next{right:6px}#mk-img-viewer.mk-multi{padding-bottom:98px}#mk-img-viewer.mk-multi img{max-height:calc(100vh - 168px);max-height:calc(100dvh - 168px)}}`;
+ document.head.appendChild(css);
 })();
 </script>
 
