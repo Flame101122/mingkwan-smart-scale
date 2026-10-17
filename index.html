@@ -143,7 +143,7 @@ function dlg(title,{input=false,ok='ตกลง',danger=false,no='ยกเล�
  d.innerHTML=`<b>${esc(title)}</b>${body}${input?`<textarea id="di" rows="3" style="margin-top:8px" placeholder="${esc(ph)}">${esc(init)}</textarea>`:''}<div class="row" style="margin-top:10px"><button id="dn">${no}</button><button id="dk" class="${danger?'dan':'pri'}">${ok}</button></div>`;
  document.body.appendChild(d);d.showModal();const done=v=>{d.remove();r(v)};d.oncancel=()=>done(null);d.querySelector('#dn').onclick=()=>done(null);
  d.querySelector('#dk').onclick=()=>{const v=input?d.querySelector('#di').value.trim():true;if(input&&!v)return d.querySelector('#di').focus();done(v)}})}
-const BUILD='2026-10-14 r13';console.log('Mingkwan build',BUILD);
+const BUILD='2026-10-17 r15';console.log('Mingkwan build',BUILD);
 const sb=supabase.createClient('https://sunifccylaokivalwjic.supabase.co','sb_publishable_mNYJioB49fgTQZZzQq3zgg_QpA0fu2n',{global:{fetch:(u,o)=>fetch(u,{...o,cache:'no-store'})}});
 let ME=null,T=[],saving=false;const TABS={clerk:['weigh','truck','dash','mine'],cashier:['dash','admin','hist','stock','rep'],admin:['weigh','truck','dash','admin','hist','staff','audit','stock','rep','prod','set']},RL={clerk:'User — พนักงานชั่ง',cashier:'ผู้จ่ายเงิน/บัญชี',admin:'Admin'},can=t=>TABS[ME?.role]?.includes(t),FRONT=['weigh','truck','dash','mine'],TC={weigh:'#22c55e',truck:'#0ea5e9',dash:'#818cf8',mine:'#2dd4bf',admin:'#f59e0b',hist:'#a78bfa',audit:'#f472b6',stock:'#fb923c',rep:'#60a5fa',prod:'#a3e635',set:'#94a3b8',staff:'#e879f9'};
 let S={shop:'Mingkwan Smart Scale',recorder:'พนักงาน 1',pin:'1234',tares:'ตะกร้าเล็ก:1.2,ตะกร้าใหญ่:2.5,กระสอบ:0.3',unit:'kg'};
@@ -916,68 +916,6 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
   const H=out.reduce((a,x)=>a+x.h,0)+24,cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W,H);c.fillStyle='#000';let y=8;for(const x of out){x.d(c,y);y+=x.h}return cv};
 })();
 </script>
-<script>
-// ===== r14 add-on: ใบรับ — รวมสินค้าชื่อเดียวกันเป็นกลุ่ม + สรุปท้ายกลุ่ม + โลโก้ KHW =====
-// ไม่แตะข้อมูลในฐานข้อมูล/บิลเดิม: จัดกลุ่มเฉพาะตอนแสดงผลใบรับ
-// เขียนทับ rcRows (ใช้ร่วมกันทั้งพิมพ์ผ่านเบราว์เซอร์ + ESC/POS + ใบร่าง + ทดสอบพิมพ์) และห่อ rcHtml / rcCanvas เพื่อใส่โลโก้
-(function(){
- if(window.__mk14)return;window.__mk14=1;
- const SUM_SINGLE=false; // true = แสดงสรุปท้ายกลุ่มแม้สินค้านั้นชั่งครั้งเดียว
-
- window.rcRows=function(rc){
-  const R=[],t=new Date(rc.ts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'});
-  R.push({k:'c',a:rc.shop,bold:1,big:1},{k:'c',a:rc.title},{k:'l',a:'เลขที่ '+rc.no},{k:'l',a:'วันที่ '+t},{k:'l',a:'ผู้ขาย: '+rc.seller},{k:'l',a:'ผู้ชั่ง: '+rc.weigher+' ('+rc.scale+')'});
-  if(rc.note)R.push({k:'l',a:rc.note});
-  R.push({k:'hr'});
-
-  // จัดกลุ่มตามชื่อสินค้า — ลำดับกลุ่ม = ลำดับที่ปรากฏครั้งแรก, ลำดับในกลุ่ม = ลำดับการชั่งจริง
-  const G=new Map();
-  rc.lines.forEach(l=>{if(!G.has(l.name))G.set(l.name,[]);G.get(l.name).push(l)});
-
-  G.forEach((ls,name)=>{
-   R.push({k:'l',a:name,bold:1});
-   ls.forEach((l,i)=>{
-    const n=ls.length>1?(i+1)+') ':'';
-    if(l.pending){R.push({k:'l',a:'  '+n+'รถหนัก '+f2(l.heavy)+' กก. (รอชั่งรถเบา)',small:1});return}
-    R.push({k:'lr',a:'  '+n+f2(l.net)+' กก. x '+f2(l.price),b:f2(l.amount)});
-    R.push({k:'l',a:l.truck?'  (รถหนัก '+f2(l.heavy)+' - รถเบา '+f2(l.light)+(l.tare?' - หัก '+f2(l.tare):'')+')':'  (รวม '+f2(l.gross)+' หัก '+f2(l.tare)+(l.pct?' เจือปน '+l.pct+'%':'')+')',small:1});
-   });
-   // สรุปท้ายกลุ่ม (คิดจากรายการจริงที่ชั่งเสร็จแล้ว ไม่บวกซ้ำ)
-   const done=ls.filter(l=>!l.pending);
-   if(done.length>1||(SUM_SINGLE&&done.length)){
-    const net=r2(done.reduce((a,l)=>a+(+l.net||0),0)),tare=r2(done.reduce((a,l)=>a+(+l.tare||0),0)),amt=r2(done.reduce((a,l)=>a+(+l.amount||0),0));
-    R.push({k:'lr',a:'  รวม '+done.length+' ครั้ง น้ำหนักสุทธิ',b:f2(net)+' กก.',bold:1},
-           {k:'lr',a:'  ภาชนะ/หักรวม',b:f2(tare)+' กก.',small:1},
-           {k:'lr',a:'  ยอดรวม '+name,b:f2(amt),bold:1});
-   }
-  });
-
-  R.push({k:'hr'},{k:'lr',a:'รวมสุทธิ',b:f2(rc.total)+' บาท',bold:1,big:1},{k:'sp'},{k:'l',a:'ลงชื่อผู้ขาย ______________'},{k:'sp'},{k:'c',a:'ขอบคุณที่ใช้บริการ',small:1});
-  return R};
-
- // ---- โลโก้: พิมพ์ผ่านเบราว์เซอร์ (K,H ดำ / W เทาเข้ม) ----
- const html0=window.rcHtml;
- window.rcHtml=function(rc){
-  const logo='<div style="text-align:center;font:900 34px/1 Prompt,sans-serif;letter-spacing:3px;margin:0 0 3px;-webkit-print-color-adjust:exact;print-color-adjust:exact"><span style="color:#000">KH</span><span style="color:#555;-webkit-text-stroke:.5px #333">W</span></div>';
-  return html0(rc).replace('<body>','<body>'+logo)};
-
- // ---- โลโก้: ESC/POS (ภาพขาวดำ) — W ใช้ลายจุดสลับ + ขอบดำบาง ให้ดูเป็นเทาแต่ยังอ่านชัด ----
- const cv0=window.rcCanvas;
- window.rcCanvas=async function(rc){
-  const cv=await cv0(rc),W=cv.width,fs=W==384?54:66,LH=Math.round(fs*1.3);
-  try{await document.fonts.load('900 '+fs+'px Prompt')}catch(e){}
-  const o=document.createElement('canvas');o.width=W;o.height=cv.height+LH;const c=o.getContext('2d');
-  c.fillStyle='#fff';c.fillRect(0,0,W,o.height);
-  c.font='900 '+fs+'px Prompt,sans-serif';c.textBaseline='top';c.textAlign='left';
-  const gap=Math.round(fs*.1),L=['K','H','W'],w=L.map(ch=>c.measureText(ch).width);
-  let x=(W-(w[0]+w[1]+w[2]+gap*2))/2;const y=4;
-  c.fillStyle='#000';c.fillText('K',x,y);x+=w[0]+gap;c.fillText('H',x,y);x+=w[1]+gap;
-  const p=document.createElement('canvas');p.width=p.height=2;const pc=p.getContext('2d');pc.fillStyle='#000';pc.fillRect(0,0,1,1);pc.fillRect(1,1,1,1);
-  c.fillStyle=c.createPattern(p,'repeat');c.fillText('W',x,y);
-  c.strokeStyle='#000';c.lineWidth=Math.max(2,fs*.04);c.lineJoin='round';c.strokeText('W',x,y);
-  c.drawImage(cv,0,LH);return o};
-})();
-</script>
 
 <script>
 // ===== r13 add-on: แดชบอร์ดกราฟแนวโน้ม (เลือกช่วงอิสระ) + เมนู "ปิดวัน/สรุปยอด" =====
@@ -1127,6 +1065,84 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
  .mk-ck{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--b)}.mk-ck:last-child{border-bottom:0}
  .mk-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}@media(max-width:800px){.mk-2{grid-template-columns:1fr}.mk-hd{font-size:20px}}
  .stat small{display:block;margin-top:2px}.mk-tr .stats{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.mk-tr .stat b,#mkCb .stat b{font-size:clamp(18px,2vw,24px);overflow-wrap:anywhere}nav button[data-t=close]{--c1:#14b8a6}`;document.head.appendChild(css);
+})();
+</script>
+
+<script>
+// ===== r14 add-on: รีเฟรช/เลื่อนจอแล้ว "ไม่เด้งออกหน้าล็อกอิน" + แอดมินดูว่าใครออนไลน์ =====
+// ไม่แก้โค้ดเดิม: ห่อ showLogin / logout / rSet แล้วจำบทบาทไว้ในเครื่อง (ออกจากระบบเมื่อกดปุ่ม "ออก" เท่านั้น)
+(function(){
+ if(window.__mk14)return;window.__mk14=1;
+ const KEY='mk_role',get=()=>{try{return localStorage.getItem(KEY)}catch(e){return null}},set=v=>{try{v?localStorage.setItem(KEY,v):localStorage.removeItem(KEY)}catch(e){}};
+ let tries=0,out=false,spl=null;
+ // ---------- หน้าจอ "กำลังกลับเข้าสู่ระบบ" แทนการเด้งไปหน้าล็อกอิน ----------
+ function splash(on,txt){if(!on){if(spl){spl.remove();spl=null}return}
+  if(!spl){spl=document.createElement('div');spl.style.cssText='position:fixed;inset:0;z-index:30;background:#0f1b2d;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font:600 16px Prompt,system-ui,sans-serif';
+   spl.innerHTML='<div style="font-size:44px;font-weight:900;letter-spacing:3px"><span style="color:#22c55e">KH</span>W</div><div id="mkSplT"></div>';document.body.appendChild(spl);setTimeout(()=>{if(spl&&!ME)splash(0)},20000)}
+  spl.querySelector('#mkSplT').textContent=txt||'กำลังเข้าสู่ระบบ...'}
+ if(get())splash(1,'กำลังกลับเข้าสู่ระบบ...');
+ // ---------- ห่อ showLogin: ถ้าเคยเข้าระบบไว้ ให้กลับเข้าเองแทนโชว์หน้าล็อกอิน ----------
+ const sl0=window.showLogin;
+ window.showLogin=function(msg){const r=get();
+  if(!out&&r&&!msg){
+   if(PRE&&PRE.role==r&&!ME){want=r;PRE=null;splash(1,'กำลังกลับเข้าสู่ระบบ...');return boot()}          // กรณีรีเฟรชหน้า: เซสชันยังอยู่
+   if(!PRE&&!ME&&tries<10){tries++;splash(1,'กำลังเชื่อมต่อใหม่... ('+tries+')');                       // กรณีเน็ตสะดุด/โหลดโปรไฟล์ไม่ได้ชั่วคราว: ลองใหม่ ไม่เด้งออก
+    sb.auth.getSession().then(({data,error})=>{if(!error&&!(data&&data.session)){set(null);splash(0);sl0()}else setTimeout(()=>{if(!ME){want=r;boot()}},Math.min(1200*tries,6000))}).catch(()=>setTimeout(()=>{if(!ME){want=r;boot()}},3000));return}}
+  if(msg||(PRE&&r&&PRE.role!=r))set(null);splash(0);return sl0.apply(this,arguments)};
+ if(!ME&&get()){const L=document.getElementById('login');if(PRE&&PRE.role==get()){want=PRE.role;PRE=null;boot()}else if(!PRE&&L&&L.style.display=='flex'&&!document.getElementById('lerr').textContent)window.showLogin()}   // กันกรณีสคริปต์นี้โหลดช้ากว่าการเช็กเซสชัน
+ // ---------- จำบทบาทเมื่อเข้าระบบสำเร็จ / ล้างเมื่อกดออก ----------
+ const lo0=window.logout;
+ window.logout=async function(){out=true;set(null);try{if(PS.ch)await sb.removeChannel(PS.ch)}catch(e){}return lo0.apply(this,arguments)};
+ setInterval(()=>{if(out||!ME)return;if(get()!=ME.role)set(ME.role);tries=0;splash(0);if(!PS.ch)startPresence()},1000);
+ // ---------- ปลุกระบบเมื่อกลับมาเปิดจอ/เน็ตกลับมา (iPad หลับ-ตื่น) ----------
+ const wake=async()=>{if(!ME||out)return;try{await sb.auth.getSession()}catch(e){}try{await loadB()}catch(e){}};
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)wake()});addEventListener('online',wake);addEventListener('pageshow',e=>{if(e.persisted)wake()});
+
+ // =====================================================================
+ //  ผู้ใช้ออนไลน์ (Supabase Realtime Presence — ไม่ต้องแก้ฐานข้อมูล)
+ // =====================================================================
+ const PS={ch:null,st:{},since:Date.now(),prof:null,pt:0},DEV=Math.random().toString(36).slice(2,8),RLn={clerk:'พนักงานชั่ง',cashier:'ผู้จ่ายเงิน/บัญชี',admin:'แอดมิน'};
+ const dev=()=>/iPad|iPhone|Android|Mobile/i.test(navigator.userAgent)||(navigator.platform=='MacIntel'&&navigator.maxTouchPoints>1)?'📱':'💻',
+  where=()=>{const b=document.querySelector('nav button.on');return b?b.textContent.replace(/\(\d+\)/g,'').trim():'-'},
+  meta=()=>({uid:ME.id,name:ME.name,role:ME.role,dev:dev(),at:PS.since,page:where(),ts:Date.now()}),
+  dur=ms=>{const m=Math.max(0,Math.floor(ms/60000));return m<1?'เพิ่งเข้า':m<60?m+' นาที':Math.floor(m/60)+' ชม. '+(m%60)+' นาที'};
+ function startPresence(){if(PS.ch||!ME)return;
+  try{const ch=sb.channel('mk-presence',{config:{presence:{key:ME.id+':'+DEV}}});PS.ch=ch;
+   ch.on('presence',{event:'sync'},()=>{PS.st=ch.presenceState();paintOn()});
+   ch.subscribe(s=>{if(s=='SUBSCRIBED')ch.track(meta())});
+   setInterval(()=>{if(PS.ch&&!document.hidden){PS.ch.track(meta());paintOn()}},20000);
+   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&PS.ch)PS.ch.track(meta())});
+   document.getElementById('nav')?.addEventListener('click',()=>setTimeout(()=>{if(PS.ch)PS.ch.track(meta())},300))}catch(e){console.warn('presence',e)}}
+ function onlineList(){const m={};Object.values(PS.st||{}).flat().forEach(p=>{if(!p||!p.uid)return;const u=m[p.uid]=m[p.uid]||{uid:p.uid,name:p.name,role:p.role,at:p.at,page:p.page,devs:[],ts:0};u.devs.push(p.dev);if(p.at<u.at)u.at=p.at;if(p.ts>=u.ts){u.ts=p.ts;u.page=p.page}});return Object.values(m).sort((a,b)=>a.at-b.at)}
+ async function profs(){if(PS.prof&&Date.now()-PS.pt<60000)return PS.prof;try{const{data}=await sb.from('profiles').select('id,name,role,active').order('name');PS.prof=data||[];PS.pt=Date.now()}catch(e){}return PS.prof||[]}
+ function paintOn(){if(!ME||ME.role!='admin')return;const L=onlineList();
+  let c=document.getElementById('mkOn');if(!c){const w=document.getElementById('who');if(!w)return;w.insertAdjacentHTML('afterend','<button id="mkOn" class="mk-on" type="button" title="ดูผู้ใช้ที่ออนไลน์"></button>');c=document.getElementById('mkOn');c.onclick=()=>document.querySelector('nav button[data-t="set"]')?.click()}
+  c.innerHTML='<i></i> ออนไลน์ '+L.length+' คน';
+  const card=document.getElementById('mkOnCard');if(!card)return;
+  profs().then(P=>{const on=new Set(L.map(u=>u.uid)),off=P.filter(p=>p.active!==false&&!on.has(p.id));
+   card.innerHTML=`<div class="mk-h"><b style="font-size:17px">🟢 ผู้ใช้ที่ออนไลน์ตอนนี้ (${L.length})</b><span class="m">อัปเดตสด</span></div>
+   ${L.map(u=>`<div class="mk-u"><i class="d on"></i><div><b>${esc(u.name)}</b> <span class="m">· ${esc(RLn[u.role]||u.role)}</span><div class="m">อยู่หน้า ${esc(u.page||'-')} · เข้ามาแล้ว ${dur(Date.now()-u.at)}</div></div><span style="margin-left:auto">${u.devs.join(' ')}${u.devs.length>1?' ×'+u.devs.length:''}</span></div>`).join('')||'<div class="m" style="padding:8px 0">ยังไม่มีข้อมูลผู้ใช้ออนไลน์</div>'}
+   ${off.length?`<div class="m" style="margin-top:8px">ไม่ได้เปิดแอปอยู่:</div>`+off.map(p=>`<div class="mk-u off"><i class="d"></i><div>${esc(p.name)} <span class="m">· ${esc(RLn[p.role]||p.role)}</span></div></div>`).join(''):''}
+   <div class="m" style="margin-top:8px;font-size:12px">* "ออนไลน์" = เปิดแอปค้างไว้อยู่ ถ้าปิดจอ/ปิดแอปจะขึ้นเป็นไม่ได้เปิด แต่ผู้ใช้ยังไม่ถูกออกจากระบบ (ออกเฉพาะเมื่อกดปุ่ม "ออก")</div>`})}
+ const rSet0=window.rSet;window.rSet=function(){rSet0.apply(this,arguments);try{if(ME&&ME.role=='admin'){const s=document.getElementById('set');if(s&&!document.getElementById('mkOnCard')){s.insertAdjacentHTML('afterbegin','<div class="card" id="mkOnCard"></div>');paintOn()}}}catch(e){console.warn(e)}};
+ const css=document.createElement('style');css.textContent=`html,body{overscroll-behavior-y:none}
+ .mk-on{display:flex;align-items:center;gap:7px;width:100%;margin:6px 0 2px;padding:8px 12px;border:1px solid #16a34a66;background:#16a34a22;color:#86efac;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;min-height:0}
+ .mk-on i,.mk-u .d{display:inline-block;width:10px;height:10px;border-radius:50%;background:#94a3b8;flex:none}.mk-on i,.mk-u .d.on{background:#22c55e;box-shadow:0 0 0 3px #22c55e44}
+ .mk-u{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--b)}.mk-u.off{opacity:.55}`;document.head.appendChild(css);
+})();
+</script>
+
+<script>
+// ===== r15 add-on: แจ้งสาเหตุ "พักบิลไม่สำเร็จ" ให้ชัด (ไม่เปลี่ยนวิธีทำงานเดิม) =====
+(function(){
+ if(window.__mk15)return;window.__mk15=1;
+ const up0=window.upPhoto;
+ if(typeof up0=='function')window.upPhoto=async function(d,path){
+  try{return await up0.apply(this,arguments)}
+  catch(e){const m=String(e&&e.message||e);
+   if(String(path).startsWith('hold/')&&/row-level security|policy|not authorized|unauthorized|403/i.test(m))
+    throw new Error('อัปโหลดรูปของบิลที่พักไม่ได้ — ที่เก็บรูป (Storage) ยังไม่อนุญาตโฟลเดอร์ hold/ → ให้แอดมิน Run ไฟล์ fix_hold_rls.sql ใน Supabase ('+m+')');
+   throw e}};
 })();
 </script>
 
