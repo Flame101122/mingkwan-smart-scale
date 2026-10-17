@@ -478,9 +478,15 @@ async function showBill(id){const b=B.find(x=>x.id==id)||HB.find(x=>x.id==id);le
  <table><tr><th>สินค้า</th><th class="n">รวม</th><th class="n">หัก</th><th class="n">สุทธิ</th><th class="n">฿/กก.</th><th class="n">เงิน</th></tr>${b.lines.map(l=>`<tr><td>${esc(l.name)}</td><td class="n">${f2(l.gross)}</td><td class="n">${f2(l.tare)}</td><td class="n">${f2(l.net)}</td><td class="n">${f2(l.price)}</td><td class="n">${f2(l.amount)}</td></tr>`).join('')}</table><div class="tot">฿${f2(b.total)}</div>
  <div class="row" style="margin-top:8px"><button onclick="this.closest('dialog').remove()">ปิด</button><button onclick="printBill('${b.id}')">🖨 ใบเสร็จ</button>${adm&&b.status!='void'?`<button class="dan" onclick="voidBill('${b.id}')">ยกเลิกบิล</button>`:''}${b.status=='pending'&&cash?`<button class="dan" onclick="setSt('${b.id}','rejected')">ปฏิเสธ</button><button class="pri" onclick="setSt('${b.id}','approved')">✔ อนุมัติ/จ่ายเงิน</button>`:''}</div>`;
  document.body.appendChild(d);d.showModal();
- const{data:ph}=await sb.from('bill_photos').select('path').eq('bill_id',id),box=d.querySelector('#dph');
+
+  const{data:ph}=await sb.from('bill_photos').select('path,product_name').eq('bill_id',id),box=d.querySelector('#dph');
  if(!ph?.length){box.innerHTML='<span class="m">ไม่มีรูป</span>';return}
- const{data:u}=await sb.storage.from('bill-photos').createSignedUrls(ph.map(x=>x.path),3600);box.innerHTML=(u||[]).map(x=>`<img class="img-view-thumb" src="${x.signedUrl}" style="height:110px;cursor:zoom-in" alt="รูปหลักฐานในบิล" title="กดเพื่อดูรูปใหญ่" tabindex="0">`).join('')}
+ const pn=x=>{const m=/\/p(\d+)\.jpg$/.exec(x.path);return m?+m[1]:1e9};
+ const rows=ph.map((x,i)=>({...x,i})).sort((a,b)=>pn(a)-pn(b)||a.i-b.i);
+ const{data:u}=await sb.storage.from('bill-photos').createSignedUrls(rows.map(x=>x.path),3600);
+ const M=Object.fromEntries((u||[]).map(x=>[x.path,x.signedUrl]));
+ box.innerHTML=rows.filter(x=>M[x.path]).map((x,i)=>{const nm=x.product_name||'รูปเพิ่มเติม';return `<div style="max-width:150px"><img class="img-view-thumb" src="${M[x.path]}" style="height:110px;cursor:zoom-in" alt="${esc(nm)}" title="กดเพื่อดูรูปใหญ่" tabindex="0"><div class="m" style="font-size:12px;line-height:1.3;margin-top:2px;overflow-wrap:anywhere">${i+1}. ${esc(nm)}</div></div>`}).join('')}
+
 async function setSt(id,st){const{error}=await sb.rpc('approve_bill',{p_id:id,p_status:st});
  if(error){await loadB();rAdmin();return toast('ไม่สำเร็จ: '+(/approve_bill/.test(error.message)&&/function|schema cache/i.test(error.message)?'ยังไม่ได้ Run migrate9.sql ใน Supabase':error.message),9000)}
  document.getElementById('bdlg')?.remove();await loadB();rAdmin();toast(st=='approved'?'✅ จ่ายเงินแล้ว — ดูได้ที่ "ประวัติ/ยกเลิก > จ่ายแล้ว"':'ปฏิเสธบิลแล้ว',5000)}
