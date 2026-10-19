@@ -1407,10 +1407,16 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
    else{const{data,error}=await sb.from('customer_plates').insert({customer_id:c.id,plate}).select('id,plate,last_used_at').single();
     if(error){if(error.code!='23505')throw error;await load(true)}else c.customer_plates.push(data)}}
   if($('cust')?.classList.contains('on'))listPaint()}
- // ผูกกับตอนบันทึกบิลสำเร็จ (insBill ถูกเรียกใน saveBill) โดยไม่แตะ saveBill
- const ib0=window.insBill;
- if(typeof ib0=='function')window.insBill=async function(row){const r=await ib0.apply(this,arguments);
-  try{const m=/^รถทะเบียน\s+(.+)$/.exec((row&&row.note)||'');autoSave(row.seller_name,m?m[1]:'').catch(e=>console.warn('[customers] auto-save:',e&&e.message||e))}catch(e){}return r};
+  
+  // ผูกกับปุ่ม "บันทึก / ส่งจ่าย": จำชื่อ/ทะเบียนก่อนกด แล้วรอจนบิลบันทึกสำเร็จ (รายการในบิลถูกล้าง) ค่อยเก็บเข้าประวัติ
+ const sv0=window.saveBill;
+ if(typeof sv0=='function')window.saveBill=function(){
+  const name=cn(($('seller')||{}).value),plate=cn(cur.plate||($('plate')||{}).value),had=cur.lines.length>0;
+  const r=sv0.apply(this,arguments);
+  if(had&&saving&&name&&name!=GEN){let n=0;const iv=setInterval(()=>{n++;
+   if(!saving&&cur.lines.length==0){clearInterval(iv);autoSave(name,plate).catch(e=>{console.warn('[customers] auto-save:',e);toast('บันทึกประวัติลูกค้าไม่สำเร็จ: '+(e&&e.message||e),8000)})}
+   else if(!saving||n>240)clearInterval(iv)},400)}
+  return r};
 
  // ---------- เมนู "ประวัติลูกค้า" ----------
  const nav=$('nav'),main=document.querySelector('main');
