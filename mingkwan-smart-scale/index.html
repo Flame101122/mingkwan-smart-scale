@@ -1487,7 +1487,8 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 
  // ---------- เก็บในเครื่อง ----------
  async function lget(){try{const a=await idbGet('mk_stash');MEM.arr=Array.isArray(a)?a:[];return MEM.arr}catch(e){return MEM.arr||[]}}
- async function lset(a){MEM.arr=a;await idbSet('mk_stash',a)}
+  async function lset(a){MEM.arr=a;await idbSet('mk_stash',a)}
+  async function lput(it){const A=await lget(),i=A.findIndex(x=>x.id==it.id);if(i>=0){A[i]=it;await lset(A)}}
 
  // ---------- กดปุ่ม "เก็บบิล" ----------
  async function stashBill(){
@@ -1501,7 +1502,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
   resetBill();
   toast('📥 เก็บบิลแล้ว กำลังส่งขึ้นเซิร์ฟเวอร์...',3000);
   const ok=await pushOne(id);
-  toast(ok?'📥 เก็บบิล "'+label+'" เรียบร้อย (แอดมิน/ผู้จ่ายเงินเปิดต่อได้)':'📥 เก็บบิลไว้ในเครื่องแล้ว — ยังไม่ขึ้นเซิร์ฟเวอร์ จะส่งให้อัตโนมัติเมื่อพร้อม',8000);
+  toast(ok?'📥 เก็บบิล "'+label+'" เรียบร้อย (เจ้าของบิล/แอดมินเปิดต่อได้)':'📥 เก็บบิลไว้ในเครื่องแล้ว — ยังไม่ขึ้นเซิร์ฟเวอร์ จะส่งให้อัตโนมัติเมื่อพร้อม',8000);
   rStash()}
 
  // ---------- ส่งขึ้นเซิร์ฟเวอร์ (held_bills) ----------
@@ -1510,9 +1511,9 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
   PUSH.add(id);let it=null,L=[];
   try{
    L=await lget();it=L.find(x=>x.id==id);if(!it)return true;
-   if(!it.holdId&&it.owner!=ME.id){it.err='ต้องให้เจ้าของบิลล็อกอินเครื่องนี้ส่ง';await lset(L);return false}
+   if(!it.holdId&&it.owner!=ME.id){it.err='ต้องให้เจ้าของบิลล็อกอินเครื่องนี้ส่ง';await lput(it);return false}
    const{data:{session}}=await sb.auth.getSession();
-   if(!session){it.err='เซสชันหมดอายุ — กด "ออก" แล้วล็อกอินใหม่ (บิลยังอยู่ในเครื่อง)';await lset(L);return false}
+   if(!session){it.err='เซสชันหมดอายุ — กด "ออก" แล้วล็อกอินใหม่ (บิลยังอยู่ในเครื่อง)';await lput(it);return false}
    for(const l of it.lines){
     if(l.kind=='truck'){for(const k of['ph','pl'])if(isData(l[k]))l[k]=await upPhoto(l[k],'hold/'+id+'/'+uid()+'.jpg')}
     else{l.photos=await Promise.all((l.photos||[]).map(x=>isData(x)?upPhoto(x,'hold/'+id+'/'+uid()+'.jpg'):x));l.photo=l.photos[0]}}
@@ -1525,9 +1526,9 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
      const u=await sb.from('held_bills').update(row).eq('id',id).select('id');
      if(!u.error&&u.data&&u.data.length)err=null;
      else{row.label=it.label+' '+Math.random().toString(36).slice(2,5);r=await sb.from('held_bills').insert({id,recorder_id:it.owner,...row});err=r.error;if(!err)it.label=row.label}}}
-   if(err){it.err=String(err.message||err).slice(0,160);await lset(L);return false}
-   await lset(L.filter(x=>x.id!=id));loadHolds();return true
-  }catch(e){if(it){it.err=String(e&&e.message||e).slice(0,160);try{await lset(L)}catch(_){}}return false}
+   if(err){it.err=String(err.message||err).slice(0,160);await lput(it);return false}
+   await lset((await lget()).filter(x=>x.id!=id));loadHolds();return true
+  }catch(e){if(it){it.err=String(e&&e.message||e).slice(0,160);try{await lput(it)}catch(_){}}return false}
   finally{PUSH.delete(id)}}
 
  // ---------- เปิดบิลที่เก็บในเครื่องมาทำต่อ ----------
