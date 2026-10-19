@@ -1407,7 +1407,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
    else{const{data,error}=await sb.from('customer_plates').insert({customer_id:c.id,plate}).select('id,plate,last_used_at').single();
     if(error){if(error.code!='23505')throw error;await load(true)}else c.customer_plates.push(data)}}
   if($('cust')?.classList.contains('on'))listPaint()}
-  
+
   // ผูกกับปุ่ม "บันทึก / ส่งจ่าย": จำชื่อ/ทะเบียนก่อนกด แล้วรอจนบิลบันทึกสำเร็จ (รายการในบิลถูกล้าง) ค่อยเก็บเข้าประวัติ
  const sv0=window.saveBill;
  if(typeof sv0=='function')window.saveBill=function(){
@@ -1471,6 +1471,127 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
  .cu-chip{display:inline-flex;align-items:center;gap:4px;background:#cfe6ff;color:#114;border-radius:99px;padding:2px 4px 2px 10px;font-size:13px}
  .cu-chip button{min-height:0;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:#0002;color:#114;font-size:11px;line-height:1}
  nav button[data-t=cust]{--c1:#f97316}`;document.head.appendChild(css);
+})();
+</script>
+
+<script>
+// ===== r22 add-on: ปุ่ม "📥 เก็บบิล" (ใช้คู่กับ "พักบิล") =====
+// หลักการ: เก็บลงเครื่อง (IndexedDB) ก่อนเสมอ -> ล้างหน้าจอ -> แล้วค่อยส่งขึ้น held_bills (ส่งไม่ผ่านก็ไม่หาย ลองส่งใหม่เองทุก 30 วิ)
+// ไม่บังคับตั้งชื่อ / ไม่ติดเรื่องชื่อซ้ำ / เก็บได้แม้มีรายการชั่งรถที่ยังรอรถเบา / ส่ง recorder_id ชัดเจน
+// วางต่อท้ายสคริปต์ r21 และก่อน <script> ของ serviceWorker (ไม่แก้โค้ดเดิม)
+(function(){
+ if(window.__mk22)return;window.__mk22=1;
+ const PUSH=new Set(),MEM={arr:null};
+ const tm=d=>d.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+  clone=x=>JSON.parse(JSON.stringify(x)),isData=x=>String(x||'').startsWith('data:');
+
+ // ---------- เก็บในเครื่อง ----------
+ async function lget(){try{const a=await idbGet('mk_stash');MEM.arr=Array.isArray(a)?a:[];return MEM.arr}catch(e){return MEM.arr||[]}}
+ async function lset(a){MEM.arr=a;await idbSet('mk_stash',a)}
+
+ // ---------- กดปุ่ม "เก็บบิล" ----------
+ async function stashBill(){
+  if(!ME)return;if(!cur.lines.length)return toast('ยังไม่มีรายการให้เก็บ');
+  const seller=($('seller').value||'').trim()||'ลูกค้าทั่วไป',plate=cur.plate||'',id=cur.holdId||cur.stashId||crypto.randomUUID(),
+   base=[seller!='ลูกค้าทั่วไป'?seller:'',plate].filter(Boolean).join(' ')||'บิล',
+   label=cur.holdId&&cur.label?cur.label:'📥 '+base+' '+tm(new Date())+' #'+id.slice(0,4);
+  const snap={id,label,seller,plate,lines:clone(cur.lines),holdId:cur.holdId||null,origName:cur.origName||'',owner:ME.id,ownerName:ME.name,ts:Date.now(),err:''};
+  const L=await lget(),i=L.findIndex(x=>x.id==id);if(i>=0)L[i]=snap;else L.unshift(snap);
+  try{await lset(L)}catch(e){return toast('เก็บลงเครื่องไม่สำเร็จ: '+(e.message||e)+' — อย่าล้างบิล ลองพักบิลหรือจดไว้ก่อน',10000)}
+  resetBill();
+  toast('📥 เก็บบิลแล้ว กำลังส่งขึ้นเซิร์ฟเวอร์...',3000);
+  const ok=await pushOne(id);
+  toast(ok?'📥 เก็บบิล "'+label+'" เรียบร้อย (แอดมิน/ผู้จ่ายเงินเปิดต่อได้)':'📥 เก็บบิลไว้ในเครื่องแล้ว — ยังไม่ขึ้นเซิร์ฟเวอร์ จะส่งให้อัตโนมัติเมื่อพร้อม',8000);
+  rStash()}
+
+ // ---------- ส่งขึ้นเซิร์ฟเวอร์ (held_bills) ----------
+ async function pushOne(id){
+  if(!ME||PUSH.has(id))return false;PUSH.add(id);let it=null,L=[];
+  try{
+   L=await lget();it=L.find(x=>x.id==id);if(!it)return true;
+   if(!it.holdId&&it.owner!=ME.id){it.err='ต้องให้เจ้าของบิลล็อกอินเครื่องนี้ส่ง';await lset(L);return false}
+   const{data:{session}}=await sb.auth.getSession();
+   if(!session){it.err='เซสชันหมดอายุ — กด "ออก" แล้วล็อกอินใหม่ (บิลยังอยู่ในเครื่อง)';await lset(L);return false}
+   for(const l of it.lines){
+    if(l.kind=='truck'){for(const k of['ph','pl'])if(isData(l[k]))l[k]=await upPhoto(l[k],'hold/'+id+'/'+uid()+'.jpg')}
+    else{l.photos=await Promise.all((l.photos||[]).map(x=>isData(x)?upPhoto(x,'hold/'+id+'/'+uid()+'.jpg'):x));l.photo=l.photos[0]}}
+   const row={label:it.label,seller_name:it.seller,plate:it.plate||'',lines:it.lines,status:'open',updated_at:new Date().toISOString()};
+   let err=null;
+   if(it.holdId){const r=await sb.from('held_bills').update(row).eq('id',it.holdId).select('id');err=r.error;if(!err&&!(r.data&&r.data.length))err={message:'ไม่มีสิทธิ์แก้บิลที่พักนี้'}}
+   else{
+    let r=await sb.from('held_bills').insert({id,recorder_id:it.owner,...row});err=r.error;
+    if(err&&err.code=='23505'){ // มีอยู่แล้ว (ส่งซ้ำ) หรือชื่อซ้ำ
+     const u=await sb.from('held_bills').update(row).eq('id',id).select('id');
+     if(!u.error&&u.data&&u.data.length)err=null;
+     else{row.label=it.label+' '+Math.random().toString(36).slice(2,5);r=await sb.from('held_bills').insert({id,recorder_id:it.owner,...row});err=r.error;if(!err)it.label=row.label}}}
+   if(err){it.err=String(err.message||err).slice(0,160);await lset(L);return false}
+   await lset(L.filter(x=>x.id!=id));loadHolds();return true
+  }catch(e){if(it){it.err=String(e&&e.message||e).slice(0,160);try{await lset(L)}catch(_){}}return false}
+  finally{PUSH.delete(id)}}
+
+ // ---------- เปิดบิลที่เก็บในเครื่องมาทำต่อ ----------
+ async function openLocal(id){
+  if(cur.lines.length)return toast('บิลปัจจุบันยังมีรายการอยู่ — เก็บบิลหรือบันทึกก่อน',6000);
+  const L=await lget(),it=L.find(x=>x.id==id);if(!it)return;
+  const ps=it.lines.flatMap(l=>l.kind=='truck'?[l.ph,l.pl]:(l.photos||[])).filter(x=>x&&!isData(x)&&!PHU[x]);
+  if(ps.length)try{((await sb.storage.from('bill-photos').createSignedUrls(ps,3600)).data||[]).forEach(x=>PHU[x.path]=x.signedUrl)}catch(e){}
+  cur={lines:clone(it.lines),photos:[],plate:it.plate||'',holdId:it.holdId||null,label:it.label,stashId:it.id,origName:it.origName||(it.owner!=ME.id?it.ownerName:'')};
+  $('seller').value=it.seller=='ลูกค้าทั่วไป'?'':it.seller;$('plate').value=cur.plate;
+  if($('truck').classList.contains('on'))rTruck();else rLines();
+  toast('เปิดบิลที่เก็บ: '+it.label+' — แก้ไขแล้วกด "บันทึก / ส่งจ่าย" ได้เลย',6000)}
+ async function delLocal(id){
+  const L=await lget(),it=L.find(x=>x.id==id);if(!it)return;
+  if(!await dlg('ลบบิลที่เก็บไว้ในเครื่อง "'+it.label+'"? (ลบแล้วกู้คืนไม่ได้)',{ok:'ลบ',danger:true}))return;
+  await lset(L.filter(x=>x.id!=id));rStash()}
+ window.mkSt=async function(a,id){
+  if(a=='open')return openLocal(id);if(a=='del')return delLocal(id);
+  if(a=='push'){toast('กำลังส่งขึ้นเซิร์ฟเวอร์...',2500);const ok=await pushOne(id);rStash();if(!ok){const it=(await lget()).find(x=>x.id==id);toast('ส่งยังไม่ได้: '+(it&&it.err||'-'),9000)}else toast('ส่งขึ้นเซิร์ฟเวอร์แล้ว',4000)}};
+ window.stashBill=stashBill;
+
+ // ---------- แสดงรายการที่เก็บในเครื่อง ----------
+ async function rStash(){
+  if(!ME)return;let L=await lget();if(!adm)L=L.filter(x=>x.owner==ME.id);
+  const body=L.map(it=>{const tot=it.lines.filter(l=>l.net!=null).reduce((a,l)=>a+l.amount,0),pend=it.lines.some(l=>l.net==null),own=it.owner==ME.id||adm;
+   return `<div class="row2" style="align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px dashed var(--b);${pend?'background:#fde8e8;color:#222;border-radius:6px;padding:2px 6px':''}"><span><b>${esc(it.label)}</b><br><span class="m">${esc(it.seller)}${it.plate?' · '+esc(it.plate):''} · ${it.lines.length} รายการ · ฿${f2(tot)}${pend?' · <b style="color:#dc2626">รอชั่งรถเบา</b>':''}<br>เก็บโดย ${esc(it.ownerName||'-')} · ${new Date(it.ts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}<br><b style="color:#b45309">⚠ อยู่ในเครื่องนี้ ยังไม่ขึ้นเซิร์ฟเวอร์</b>${it.err?'<br><span style="color:#dc2626">'+esc(it.err)+'</span>':''}</span></span><span style="white-space:nowrap"><button class="bt-blue" onclick="mkSt('open','${it.id}')">เปิดต่อ</button> ${own?`<button onclick="mkSt('push','${it.id}')">⬆ ส่งขึ้น</button> <button class="ic del" aria-label="ลบ" onclick="mkSt('del','${it.id}')">${TRASH}</button>`:''}</span></div>`}).join('');
+  const html=L.length?`<div class="card" style="border-left:6px solid #0d9488"><b>📥 บิลที่เก็บไว้ในเครื่องนี้ (${L.length})</b>${body}</div>`:'';
+  const place=(id,anchor)=>{let el=$(id);if(!el){if(!anchor)return;el=document.createElement('div');el.id=id;anchor.insertAdjacentElement('afterend',el)}el.innerHTML=html};
+  place('mkStash',$('holds')||document.querySelector('#weigh .card.cg'));
+  if($('holds2'))place('mkStash2',$('holds2'))}
+ window.rStash=rStash;
+
+ // ---------- ผูกกับของเดิม ----------
+ const rh0=window.rHolds;window.rHolds=function(){const r=rh0.apply(this,arguments);try{rStash()}catch(e){}return r};
+ const rt0=window.rTruck;window.rTruck=function(){const r=rt0.apply(this,arguments);try{addBtn($('truck'));rStash()}catch(e){}return r};
+ // ผู้ชั่งเดิม: ถ้า admin/ผู้จ่ายเงินเปิดบิลของคนอื่นมาบันทึก ให้จดชื่อผู้ชั่งเดิมไว้ในหมายเหตุบิล
+ const rs0=window.resumeHold;
+ window.resumeHold=async function(id){const h=(typeof HOLDS!='undefined'?HOLDS:[]).find(x=>x.id==id),r=await rs0.apply(this,arguments);
+  if(h&&cur.holdId==h.id&&ME&&h.recorder_id!=ME.id)cur.origName=NAMES[h.recorder_id]||'';return r};
+ const ib0=window.insBill;
+ window.insBill=async function(row){
+  // ส่ง recorder_id/status ชัดเจน (policy ต้องการ recorder_id = auth.uid() และ status = pending) ไม่พึ่งค่า default ของฐานข้อมูล
+  let ss=(await sb.auth.getSession()).data.session;
+  if(!ss){try{ss=(await sb.auth.refreshSession()).data.session}catch(e){}}
+  if(!ss)throw new Error('เซสชันหมดอายุ — บิลยังอยู่บนหน้าจอ ให้กด 📥 เก็บบิล แล้วกด "ออก" ล็อกอินใหม่ จากนั้นเปิดบิลต่อมาบันทึก');
+  row.recorder_id=ss.user.id;row.status='pending';
+  if(cur.origName&&ME&&cur.origName!==ME.name)row.note=(row.note?row.note+' · ':'')+'ผู้ชั่งเดิม: '+cur.origName;
+  const r=await ib0.apply(this,arguments);window.__mkSavedStash=cur.stashId||null;return r};
+ // บันทึกบิลสำเร็จแล้ว ค่อยลบสำเนาในเครื่อง (ถ้าบันทึกไม่ผ่านสำเนายังอยู่)
+ const sv0=window.saveBill;
+ window.saveBill=function(){const sid=cur.stashId;window.__mkSavedStash=null;const r=sv0.apply(this,arguments);
+  if(sid){let n=0;const iv=setInterval(async()=>{n++;
+   if(!saving&&cur.lines.length==0){clearInterval(iv);if(window.__mkSavedStash==sid){const L=await lget();await lset(L.filter(x=>x.id!=sid));rStash()}}
+   else if(!saving||n>300)clearInterval(iv)},400)}
+  return r};
+
+ // ---------- เพิ่มปุ่ม ----------
+ function addBtn(root){if(!root)return;const b=root.querySelector('button[onclick="holdBill()"]');if(!b||root.querySelector('.mk-stash-btn'))return;
+  b.insertAdjacentHTML('afterend','<button class="mk-stash-btn" style="flex:1;background:#0d9488;color:#fff;border-color:#0d9488" onclick="stashBill()">📥 เก็บบิล</button>')}
+ const boot=setInterval(()=>{if(!ME)return;addBtn($('weigh'));if($('weigh')?.querySelector('.mk-stash-btn')){clearInterval(boot);rStash()}},700);
+
+ // ---------- ส่งขึ้นเซิร์ฟเวอร์อัตโนมัติ ----------
+ async function syncAll(){if(!ME||document.hidden)return;const L=await lget();for(const it of L){if(it.holdId||it.owner==ME.id)await pushOne(it.id)}rStash()}
+ setInterval(syncAll,30000);addEventListener('online',syncAll);
+ const w=setInterval(()=>{if(ME){clearInterval(w);setTimeout(syncAll,2500)}},1000);
 })();
 </script>
 
