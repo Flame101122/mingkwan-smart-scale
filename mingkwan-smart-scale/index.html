@@ -411,6 +411,7 @@ function psEnter(){const r=pFilter();if(r.length){$('psq').value='';renderPos();
 function pad(k){if(SC.lock&&scOn)return toast('โหมดล็อกน้ำหนักเปิดอยู่: ใช้ค่าจากตาชั่งเท่านั้น');gsrc='manual';const g=$('gross');let v=g.value;if(k=='C')v='';else if(k=='<')v=v.slice(0,-1);else if(k=='.'){if(!v.includes('.'))v=(v||'0')+'.'}else v+=k;g.value=v;calc()}
 async function openW(id,L){if(SC.lock&&!scOn)return toast('โหมดล็อกน้ำหนักเปิดอยู่: ต้องเชื่อมต่อตาชั่งก่อน');const p=P.find(x=>x.id==id);if(!p)return toast('ไม่พบสินค้า');$('pid').value=id;$('wt').textContent=p.name;$('wp').textContent='ราคามาตรฐาน ฿'+f2(p.price)+'/กก.';$('unitPrice').value=String(L&&L.price!=null?L.price:p.price);
  wph=[];rPh();gsrc='manual';$('gross').readOnly=SC.lock&&scOn;$('gross').value='';$('tareX').value=0;$('pct').value=0;editIdx=-1;if(L){editIdx=cur.lines.indexOf(L);$('gross').value=L.gross;$('tareSel').value=L.ts??'0';$('tareQ').value=L.tq??1;$('tareX').value=L.tx??L.tare??0;$('pct').value=L.pct||0;wph=[...(L.photos||[])];gsrc=L.src||'manual';rPh()}calc();$('wd').showModal();
+ {const g=$('gross');if(g){g.focus({preventScroll:true});try{const n=g.value.length;g.setSelectionRange(n,n)}catch(e){}}}
  if(!stream)await startCam();if(stream){const v=$('vid');v.srcObject=stream;v.play().catch(()=>{})}}
 // ---------- weigh ----------
 function byCode(){const c=$('code').value.trim().toLowerCase(),p=P.find(x=>x.code.toLowerCase()==c);if(p){$('pid').value=p.id;calc()}}
