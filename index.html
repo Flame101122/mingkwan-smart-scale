@@ -1329,6 +1329,145 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+<script>
+// ===== r21 add-on: ประวัติลูกค้า + ทะเบียนรถ (autocomplete ที่ชื่อผู้ขาย/ทะเบียน, บันทึกคนใหม่อัตโนมัติ) =====
+(function(){
+ if(window.__mk21)return;window.__mk21=1;
+ const GEN='ลูกค้าทั่วไป',CU={list:[],ok:false,t:0,p:null,err:'',warned:false};
+ const cn=s=>String(s||'').trim().replace(/\s+/g,' '),nk=s=>cn(s).toLowerCase(),pk=s=>String(s||'').replace(/\s+/g,'').toLowerCase(),
+  byName=n=>{const k=nk(n);return k?CU.list.find(c=>nk(c.name)==k):null},
+  PL=c=>[...(c.customer_plates||[])].sort((a,b)=>String(b.last_used_at||'').localeCompare(String(a.last_used_at||'')));
+
+ // ---------- โหลดรายชื่อ (แคชในเครื่อง รีเฟรชทุก 60 วิ) ----------
+ function load(force){if(!ME)return Promise.resolve();if(CU.p)return CU.p;if(!force&&Date.now()-CU.t<(CU.ok?60000:30000))return Promise.resolve();
+  CU.p=(async()=>{try{const out=[];for(let o=0;;o+=1000){const{data,error}=await sb.from('customers').select('id,name,customer_plates(id,plate,last_used_at)').order('name').range(o,o+999);if(error)throw error;out.push(...data);if(data.length<1000)break}
+    out.sort((a,b)=>a.name.localeCompare(b.name,'th'));CU.list=out;CU.ok=true;CU.err=''}
+   catch(e){CU.err=e.message||String(e);if(!CU.warned){CU.warned=1;console.warn('[customers] โหลดไม่ได้ (ต้อง Run migrate11.sql?):',CU.err)}}
+   finally{CU.t=Date.now();CU.p=null}
+   if($('cust')?.classList.contains('on'))listPaint()})();return CU.p}
+ const iv=setInterval(()=>{if(ME){clearInterval(iv);load()}},1000);
+ setInterval(()=>{if(ME&&!document.hidden)load()},60000);
+
+ // ---------- กล่องรายการ (dropdown) ----------
+ let ac=null,acFor=null;
+ const IDS=['seller','tks','plate','tkp'];
+ function hide(){if(ac)ac.style.display='none';acFor=null}
+ function place(){if(!ac||!acFor||ac.style.display!='block')return;const r=acFor.getBoundingClientRect(),below=innerHeight-r.bottom-8,above=r.top-8,up=below<200&&above>below;
+  ac.style.maxHeight=Math.max(120,Math.min(300,up?above:below))+'px';ac.style.minWidth=Math.max(220,r.width)+'px';
+  const w=ac.offsetWidth;ac.style.left=Math.max(4,Math.min(r.left,innerWidth-w-4))+'px';
+  if(up){ac.style.top='auto';ac.style.bottom=(innerHeight-r.top+4)+'px'}else{ac.style.bottom='auto';ac.style.top=(r.bottom+4)+'px'}}
+ function show(inp,head,items){if(!items.length)return hide();
+  if(!ac){ac=document.createElement('div');ac.id='mkAc';ac.addEventListener('mousedown',e=>e.preventDefault());
+   ac.addEventListener('click',e=>{const b=e.target.closest('button[data-i]');if(b&&ac._it[+b.dataset.i])ac._it[+b.dataset.i].pick()});document.body.appendChild(ac)}
+  ac._it=items;ac.innerHTML=(head?`<div class="ah">${esc(head)}</div>`:'')+items.map((x,i)=>`<button type="button" data-i="${i}">${x.html}</button>`).join('');
+  ac.style.display='block';acFor=inp;place()}
+ addEventListener('scroll',e=>{if(ac&&ac.style.display=='block'&&!ac.contains(e.target))place()},true);addEventListener('resize',place);
+ document.addEventListener('pointerdown',e=>{if(ac&&!ac.contains(e.target)&&e.target!==acFor)hide()},true);
+ document.addEventListener('keydown',e=>{if(e.key=='Escape')hide()});
+
+ // ---------- รายการชื่อ ----------
+ function nameSug(t){const q=nk(t.value);if(!q)return hide();
+  if(!CU.ok){load().then(()=>{if(CU.ok&&document.activeElement===t)nameSug(t)});return}
+  const m=CU.list.filter(c=>nk(c.name).includes(q)).sort((a,b)=>(nk(b.name).startsWith(q)-nk(a.name).startsWith(q))).slice(0,8);
+  if(m.length==1&&nk(m[0].name)==q)return hide();
+  show(t,'ลูกค้าที่เคยบันทึก',m.map(c=>{const pl=PL(c);return{html:'<b>'+esc(c.name)+'</b><small>'+(pl.length?pl.slice(0,3).map(p=>esc(p.plate)).join(' · ')+(pl.length>3?' +'+(pl.length-3):''):'ยังไม่มีทะเบียน')+'</small>',pick:()=>pickName(c,t)}}))}
+ function pickName(c,t){['seller','tks'].forEach(id=>{const e=$(id);if(e)e.value=c.name});hide();
+  const L=PL(c),pi=$(t.id=='tks'?'tkp':'plate')||$('plate');
+  if(L.length==1)setPlate(L[0].plate);
+  else if(L.length>1&&pi){pi.focus();plateSug(pi)}}
+
+ // ---------- รายการทะเบียน ----------
+ function plateSug(t){const q=pk(t.value),c=byName(($('seller')||{}).value);
+  if(!CU.ok){load().then(()=>{if(CU.ok&&document.activeElement===t)plateSug(t)});return}
+  if(c){const L=PL(c).filter(p=>!q||pk(p.plate).includes(q));if(L.length==1&&pk(L[0].plate)==q)return hide();
+   return show(t,'ทะเบียนของ '+c.name,L.map(p=>({html:'<b>'+esc(p.plate)+'</b>',pick:()=>pickPlate(p,null,t)})))}
+  if(!q)return hide();
+  const out=[];for(const cc of CU.list){for(const p of cc.customer_plates||[])if(pk(p.plate).includes(q))out.push({p,cc});if(out.length>=8)break}
+  show(t,'ทะเบียนที่เคยบันทึก',out.slice(0,8).map(({p,cc})=>({html:'<b>'+esc(p.plate)+'</b><small>'+esc(cc.name)+'</small>',pick:()=>pickPlate(p,cc.name,t)})))}
+ function pickPlate(p,name,t){setPlate(p.plate);
+  if(name){const s=$('seller');if(s&&!cn(s.value)){s.value=name;const k=$('tks');if(k)k.value=name}}
+  hide();t.blur()}
+
+ // ---------- ผูกกับช่องกรอก (ใช้ event delegation เพราะหน้าชั่งรถสร้างช่องใหม่ทุกครั้ง) ----------
+ document.addEventListener('input',e=>{const t=e.target;if(!t||!t.id)return;if(t.id=='seller'||t.id=='tks')nameSug(t);else if(t.id=='plate'||t.id=='tkp')plateSug(t)});
+ document.addEventListener('focusin',e=>{const t=e.target;if(!t||!IDS.includes(t.id))return;t.setAttribute('autocomplete','off');
+  if(t.id=='seller'||t.id=='tks'){if(t.value.trim())nameSug(t)}else plateSug(t)});
+ document.addEventListener('focusout',()=>setTimeout(()=>{const a=document.activeElement;if(!(a&&IDS.includes(a.id)))hide()},150));
+
+ // ---------- บันทึกลูกค้า/ทะเบียนใหม่อัตโนมัติ ----------
+ async function autoSave(name,plate){name=cn(name);plate=cn(plate);if(!name||name==GEN)return;
+  if(!CU.ok)await load(true);
+  let c=byName(name);
+  if(!c){const{data,error}=await sb.from('customers').insert({name}).select('id,name').single();
+   if(error){if(error.code=='23505'){await load(true);c=byName(name)}else throw error}
+   else{c={id:data.id,name:data.name,customer_plates:[]};CU.list.push(c);CU.list.sort((a,b)=>a.name.localeCompare(b.name,'th'))}}
+  if(!c)return;c.customer_plates=c.customer_plates||[];
+  if(plate){const p=c.customer_plates.find(x=>pk(x.plate)==pk(plate)),now=new Date().toISOString();
+   if(p){await sb.from('customer_plates').update({last_used_at:now}).eq('id',p.id);p.last_used_at=now}
+   else{const{data,error}=await sb.from('customer_plates').insert({customer_id:c.id,plate}).select('id,plate,last_used_at').single();
+    if(error){if(error.code!='23505')throw error;await load(true)}else c.customer_plates.push(data)}}
+  if($('cust')?.classList.contains('on'))listPaint()}
+ // ผูกกับตอนบันทึกบิลสำเร็จ (insBill ถูกเรียกใน saveBill) โดยไม่แตะ saveBill
+ const ib0=window.insBill;
+ if(typeof ib0=='function')window.insBill=async function(row){const r=await ib0.apply(this,arguments);
+  try{const m=/^รถทะเบียน\s+(.+)$/.exec((row&&row.note)||'');autoSave(row.seller_name,m?m[1]:'').catch(e=>console.warn('[customers] auto-save:',e&&e.message||e))}catch(e){}return r};
+
+ // ---------- เมนู "ประวัติลูกค้า" ----------
+ const nav=$('nav'),main=document.querySelector('main');
+ if(nav&&main&&!document.querySelector('nav [data-t="cust"]')){
+  const mine=nav.querySelector('[data-t="mine"]'),btn='<button data-t="cust">👤 ประวัติลูกค้า</button>';
+  if(mine)mine.insertAdjacentHTML('afterend',btn);else nav.insertAdjacentHTML('beforeend',btn);
+  main.insertAdjacentHTML('beforeend','<section id="cust"></section>');
+  for(const r of['clerk','cashier','admin'])if(!TABS[r].includes('cust'))TABS[r].push('cust');
+  FRONT.push('cust');TC.cust='#f97316';
+  if(typeof ME!=='undefined'&&ME)document.querySelectorAll('nav button').forEach(b=>{if(!can(b.dataset.t))b.style.display='none'});
+  nav.addEventListener('click',e=>{if(e.target.closest('button')?.dataset.t=='cust'&&can('cust'))rCust()})}
+
+ window.rCust=function(){const el=$('cust');if(!el)return;
+  el.innerHTML=`<div class="card"><b style="font-size:18px">👤 ประวัติลูกค้า / ทะเบียนรถ</b>
+  <div class="m">ระบบเพิ่มชื่อและทะเบียนให้เองเมื่อบันทึกบิล (ต้องกรอกชื่อผู้ขาย) · ลูกค้า 1 คนมีได้หลายทะเบียน · ที่หน้า "ชั่ง/รับซื้อ" พิมพ์ชื่อแล้วจะขึ้นรายชื่อให้เลือก</div>
+  <div class="row" style="margin-top:8px;align-items:end"><div style="flex:2;min-width:180px"><label>ชื่อลูกค้า</label><input id="cun" autocomplete="off" placeholder="เช่น ลุงสมชาย"></div><div><label>ทะเบียนรถ (ถ้ามี)</label><input id="cup" autocomplete="off" placeholder="1กข 1234"></div><button class="pri" id="cuAdd">➕ เพิ่มลูกค้า</button></div></div>
+  <div class="card"><input id="cuq" placeholder="🔍 ค้นหาชื่อหรือทะเบียน" autocomplete="off"><div id="cuL" style="margin-top:8px"></div></div>`;
+  $('cuq').oninput=listPaint;$('cuAdd').onclick=addCust;$('cuL').onclick=rowAct;listPaint();load(true)};
+ const rowH=c=>{const pl=PL(c),id=esc(c.id);return `<div class="cu-row"><div style="flex:1;min-width:180px"><b>${esc(c.name)}</b><div class="cu-pl">${pl.map(p=>`<span class="cu-chip">${esc(p.plate)}<button type="button" data-a="dp" data-c="${id}" data-p="${esc(p.id)}" aria-label="ลบทะเบียน">✕</button></span>`).join('')||'<span class="m">ยังไม่มีทะเบียน</span>'}</div></div>
+  <div class="cu-act"><button type="button" data-a="ap" data-c="${id}">➕ ทะเบียน</button><button type="button" class="ic ed" data-a="rn" data-c="${id}" aria-label="แก้ชื่อ">✏️</button>${adm?`<button type="button" class="ic del" data-a="dc" data-c="${id}" aria-label="ลบลูกค้า">${TRASH}</button>`:''}</div></div>`};
+ function listPaint(){const box=$('cuL');if(!box)return;
+  if(!CU.ok){box.innerHTML=CU.err?`<div class="m" style="color:var(--d)">โหลดไม่ได้: ${esc(CU.err)}<br>ถ้ายังไม่ได้สร้างตาราง ให้ Run migrate11.sql ใน Supabase ก่อน</div>`:'<div class="m">กำลังโหลด...</div>';return}
+  const q=nk(($('cuq')||{}).value),k=pk(q);
+  let L=CU.list.filter(c=>!q||nk(c.name).includes(q)||(k&&(c.customer_plates||[]).some(p=>pk(p.plate).includes(k))));const n=L.length;L=L.slice(0,200);
+  box.innerHTML=`<div class="m" style="margin-bottom:6px">ทั้งหมด ${CU.list.length} ราย${q?' · พบ '+n:''}${n>200?' · แสดง 200 รายแรก (พิมพ์ค้นหาเพิ่ม)':''}</div>`+(L.map(rowH).join('')||'<div class="m" style="padding:10px 0">ยังไม่มีลูกค้า</div>')}
+ async function addCust(){const name=cn($('cun').value),plate=cn($('cup').value);if(!name)return toast('กรอกชื่อลูกค้า');if(name==GEN)return toast('"'+GEN+'" เป็นค่าเริ่มต้นของระบบ ใช้ชื่ออื่น');
+  try{if(!CU.ok)await load(true);const ex=byName(name);await autoSave(name,plate);toast(ex?'มีลูกค้านี้อยู่แล้ว'+(plate?' — เพิ่มทะเบียนให้แล้ว':''):'เพิ่มลูกค้าแล้ว');$('cun').value='';$('cup').value='';listPaint()}
+  catch(e){toast('ไม่สำเร็จ: '+(e.message||e),7000)}}
+ async function rowAct(e){const b=e.target.closest('button[data-a]');if(!b)return;const a=b.dataset.a,c=CU.list.find(x=>x.id==b.dataset.c);if(!c)return;
+  try{
+   if(a=='ap'){const v=cn(await dlg('เพิ่มทะเบียนรถให้ "'+c.name+'"',{input:true,ph:'เช่น 1กข 1234',ok:'เพิ่ม'}));if(!v)return;
+    if((c.customer_plates||[]).some(p=>pk(p.plate)==pk(v)))return toast('ลูกค้านี้มีทะเบียนนี้อยู่แล้ว');
+    const{data,error}=await sb.from('customer_plates').insert({customer_id:c.id,plate:v}).select('id,plate,last_used_at').single();if(error)throw error;(c.customer_plates=c.customer_plates||[]).push(data)}
+   else if(a=='dp'){const p=(c.customer_plates||[]).find(x=>x.id==b.dataset.p);if(!p)return;
+    if(!await dlg('ลบทะเบียน "'+p.plate+'" ของ '+c.name+'?',{ok:'ลบ',danger:true}))return;
+    const{data,error}=await sb.from('customer_plates').delete().eq('id',p.id).select('id');if(error)throw error;if(!data?.length)throw new Error('ลบไม่ได้ (ไม่มีสิทธิ์หรือถูกลบไปแล้ว)');c.customer_plates=c.customer_plates.filter(x=>x.id!=p.id)}
+   else if(a=='rn'){const v=cn(await dlg('แก้ชื่อลูกค้า',{input:true,init:c.name,ok:'บันทึก'}));if(!v||v==c.name)return;if(v==GEN)throw new Error('ใช้ชื่อนี้ไม่ได้');
+    const o=byName(v);if(o&&o.id!=c.id)throw new Error('มีลูกค้าชื่อนี้อยู่แล้ว');
+    const{data,error}=await sb.from('customers').update({name:v}).eq('id',c.id).select('id');if(error)throw error;if(!data?.length)throw new Error('แก้ไม่ได้ (ไม่มีสิทธิ์)');c.name=v;CU.list.sort((x,y)=>x.name.localeCompare(y.name,'th'))}
+   else if(a=='dc'){if(!await dlg('ลบลูกค้า "'+c.name+'" พร้อมทะเบียนทั้งหมด? (บิลเก่าไม่หาย)',{ok:'ลบลูกค้า',danger:true}))return;
+    const{data,error}=await sb.from('customers').delete().eq('id',c.id).select('id');if(error)throw error;if(!data?.length)throw new Error('ลบไม่ได้ (เฉพาะแอดมิน)');CU.list=CU.list.filter(x=>x.id!=c.id)}
+  }catch(err){toast('ไม่สำเร็จ: '+(err.message||err),7000)}
+  listPaint()}
+
+ const css=document.createElement('style');css.textContent=`
+ #mkAc{position:fixed;z-index:45;display:none;background:var(--c);color:var(--t);border:1px solid var(--b);border-radius:10px;box-shadow:0 6px 24px #0004;overflow-y:auto;padding:4px;max-width:min(92vw,420px)}
+ #mkAc .ah{font-size:12px;color:var(--m);padding:4px 8px}
+ #mkAc button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;border:0;background:transparent;padding:9px 10px;min-height:44px;border-radius:8px;white-space:normal}
+ #mkAc button:hover{background:var(--bg)}#mkAc small{color:var(--m);font-size:12px}
+ .cu-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px dashed var(--b)}
+ .cu-pl{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.cu-act{display:flex;gap:6px;align-items:center}
+ .cu-chip{display:inline-flex;align-items:center;gap:4px;background:#cfe6ff;color:#114;border-radius:99px;padding:2px 4px 2px 10px;font-size:13px}
+ .cu-chip button{min-height:0;width:22px;height:22px;padding:0;border:0;border-radius:50%;background:#0002;color:#114;font-size:11px;line-height:1}
+ nav button[data-t=cust]{--c1:#f97316}`;document.head.appendChild(css);
+})();
+</script>
+
 <script>  
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
