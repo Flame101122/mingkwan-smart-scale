@@ -1598,6 +1598,55 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+ <script>
+// ===== r23 add-on: หน้าต่างชั่งน้ำหนักบนมือถือ =====
+// 1) แถบสรุปค้างบนสุด (sticky) แสดง น้ำหนักรวมที่พิมพ์ / น้ำหนักสุทธิ / จ่ายทั้งหมด ให้เห็นตลอดตอนกดปุ่มตัวเลข
+// 2) กดปุ่มตัวเลขเร็ว ๆ ไม่ซูมหน้าจอ (touch-action + ตัวช่วยสำรองสำหรับ iOS)
+// ไม่แก้ฟังก์ชันเดิม: เพิ่ม CSS เฉพาะ #wd และอ่านค่าจากช่องเดิมเท่านั้น วางต่อท้ายสคริปต์ r22 และก่อน <script> ของ serviceWorker
+(function(){
+ if(window.__mk23)return;window.__mk23=1;
+ const css=document.createElement('style');
+ css.textContent=`
+  #wd,#wd *{touch-action:manipulation}
+  #mkWdBar{display:none}
+  @media(max-width:800px){
+   #wd{overscroll-behavior:contain}
+   #mkWdBar{display:flex;align-items:center;gap:10px;position:sticky;top:-16px;z-index:20;margin:-16px -16px 10px;padding:8px 16px;background:var(--c);border-bottom:2px solid var(--p,#16a34a);box-shadow:0 3px 8px rgba(0,0,0,.18)}
+   #mkWdBar .mkw-g{flex:1.3;min-width:0}
+   #mkWdBar .mkw-g small,#mkWdBar .mkw-s small{display:block;font-size:12px;color:var(--m);line-height:1.2}
+   #mkWdBar .mkw-g b{display:block;font-size:34px;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+   #mkWdBar .mkw-s{flex:1;min-width:0;text-align:right}
+   #mkWdBar .mkw-s b{display:block;font-size:17px;line-height:1.25;font-variant-numeric:tabular-nums;white-space:nowrap}
+   #mkWdBar .mkw-s b.amt{color:var(--p,#16a34a);font-size:20px}
+   #wd .np button{padding:10px;min-height:52px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  }`;
+ document.head.appendChild(css);
+
+ const wd=document.getElementById('wd');if(!wd)return;
+ const bar=document.createElement('div');bar.id='mkWdBar';
+ bar.innerHTML='<div class="mkw-g"><small>น้ำหนักรวมที่กรอก (กก.)</small><b id="mkwG">-</b></div><div class="mkw-s"><small>น้ำหนักสุทธิ</small><b id="mkwN">0.00 กก.</b><b class="amt" id="mkwA">฿0.00</b></div>';
+ wd.insertBefore(bar,wd.firstChild);
+
+ const g=document.getElementById('gross'),rn=document.getElementById('rnet'),ra=document.getElementById('ramt'),
+  eg=document.getElementById('mkwG'),en=document.getElementById('mkwN'),ea=document.getElementById('mkwA');
+ let last='';
+ function upd(){
+  if(!wd.open)return;
+  const v=g?g.value:'',key=v+'|'+(rn&&rn.textContent)+'|'+(ra&&ra.textContent);if(key===last)return;last=key;
+  eg.textContent=v===''?'0':v;en.textContent=(rn?rn.textContent:'0.00')+' กก.';ea.textContent=ra?ra.textContent:'฿0.00'}
+ setInterval(upd,120);
+ wd.addEventListener('input',upd,true);wd.addEventListener('click',()=>setTimeout(upd,0),true);
+
+ // กันซูมจากการแตะสองครั้งเร็ว ๆ บน iOS: ทุกการแตะยังนับเป็นการกดปุ่มตามปกติ
+ let lt=0;
+ wd.addEventListener('touchend',e=>{
+  const b=e.target.closest&&e.target.closest('.np button');if(!b)return;
+  const n=Date.now();
+  if(n-lt<450){e.preventDefault();b.click()}
+  lt=n},{passive:false,capture:true});
+})();
+</script>
+
 <script>  
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
