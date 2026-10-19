@@ -1506,7 +1506,8 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 
  // ---------- ส่งขึ้นเซิร์ฟเวอร์ (held_bills) ----------
  async function pushOne(id){
-  if(!ME||PUSH.has(id))return false;PUSH.add(id);let it=null,L=[];
+    if(!ME||PUSH.has(id)||(cur&&cur.stashId==id))return false;
+  PUSH.add(id);let it=null,L=[];
   try{
    L=await lget();it=L.find(x=>x.id==id);if(!it)return true;
    if(!it.holdId&&it.owner!=ME.id){it.err='ต้องให้เจ้าของบิลล็อกอินเครื่องนี้ส่ง';await lset(L);return false}
