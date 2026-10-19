@@ -606,7 +606,7 @@ async function purgeAll(){if(!await dlg('ลบบิลที่ยกเลิ
 // ---------- audit (owner) ----------
 async function rAudit(){const el=$('audit'),d=el.dataset.d||new Date().toISOString().slice(0,10);el.dataset.d=d;
  const f=new Date(d+'T00:00:00').getTime(),bs=B.filter(b=>b.ts>=f&&b.ts<f+864e5&&['pending','approved'].includes(b.status));
- let ph=[],U={};if(bs.length){ph=(await sb.from('bill_photos').select('bill_id,path,product_name').in('bill_id',bs.map(b=>b.id))).data||[];
+ let ph=[],U={};if(bs.length){ph=(await sb.from('bill_photos').select('bill_id,path,product_name').in('bill_id',bs.map(b=>b.id))).data||[];ph=ph.map((x,i)=>({...x,i})).sort((a,b)=>{const n=x=>{const m=/\/p(\d+)\.jpg$/.exec(x.path);return m?+m[1]:1e9};return n(a)-n(b)||a.i-b.i});
   if(ph.length)((await sb.storage.from('bill-photos').createSignedUrls(ph.map(x=>x.path),3600)).data||[]).forEach(x=>U[x.path]=x.signedUrl)}
  const un=bs.filter(b=>b.audit=='none').length,fl=bs.filter(b=>b.audit=='flagged').length,tot=bs.reduce((a,b)=>a+b.total,0);
  el.innerHTML=`<div class="card row"><div><label>วันที่</label><input type="date" value="${d}" onchange="$('audit').dataset.d=this.value;rAudit()"></div><div><b>${bs.length}</b> บิล · ฿${f2(tot)}</div><div>รอตรวจรูป <b>${un}</b> · พบผิดปกติ <b style="color:var(--d)">${fl}</b></div></div><div class="m" style="margin:-4px 0 8px">ตรวจรูปเทียบกับสินค้าที่เลือก (แยกจากการจ่ายเงิน) — ตรงกันกด ✅ ผิดปกติกด ⚠️</div>`+
