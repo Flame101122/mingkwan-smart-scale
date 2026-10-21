@@ -1633,6 +1633,90 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
  wd.addEventListener('close',()=>{wd.style.paddingBottom=''});
 })();
 </script>
+
+
+ <script>
+// ===== r24 add-on: เก็บ/แสดงรายละเอียดการชั่งรถ (รถหนัก, รถเบา, หัก, สุทธิ) ในบิลและใบเสร็จ =====
+(function(){
+ if(window.__mk24)return;window.__mk24=1;
+
+ // ---------- 1) ตอนบันทึก: ส่ง heavy_kg / light_kg ไปกับ bill_items ----------
+ const ii0=window.insItems;
+ window.insItems=async function(rows){
+  const L=(typeof cur!=='undefined'&&cur.lines)||[];
+  let ext=rows;
+  if(L.length===rows.length&&L.some(l=>l.kind=='truck')){
+   ext=rows.map((r,i)=>L[i].kind=='truck'?{...r,heavy_kg:L[i].heavy,light_kg:L[i].light}:r);
+  }
+  try{return await ii0.call(this,ext)}
+  catch(e){
+   // ยังไม่ได้ Run migrate12.sql -> บันทึกแบบเดิม ไม่ให้บิลล้ม
+   if(ext!==rows&&/heavy_kg|light_kg/.test(String(e&&e.message))){
+    console.warn('[r24] ยังไม่มีคอลัมน์ heavy_kg/light_kg (Run migrate12.sql)');
+    return ii0.call(this,rows)}
+   throw e}};
+
+ // ---------- 2) ตอนโหลดบิล: ใส่ข้อมูลรถหนัก/เบากลับเข้า line ----------
+ const mb0=window.mapBill;
+ window.mapBill=function(b){
+  const o=mb0.apply(this,arguments);
+  o.lines.forEach((l,i)=>{const it=(b.bill_items||[])[i];
+   if(it&&it.heavy_kg!=null&&it.light_kg!=null){l.truck=true;l.heavy=+it.heavy_kg;l.light=+it.light_kg;l.deduct=+l.tare}});
+  return o};
+
+ // ---------- 3) หน้าต่างดูบิล: เพิ่มแถวรายละเอียดใต้รายการชั่งรถ ----------
+ const sb0=window.showBill;
+ window.showBill=function(id){
+  const p=sb0.apply(this,arguments);
+  try{
+   const b=B.find(x=>x.id==id)||HB.find(x=>x.id==id),d=document.getElementById('bdlg');
+   if(b&&d){
+    const trs=[...d.querySelectorAll('table tr')].slice(1);
+    b.lines.map((l,i)=>[l,trs[i]]).reverse().forEach(([l,tr])=>{
+     if(!l.truck||!tr)return;
+     tr.insertAdjacentHTML('afterend',
+      `<tr><td colspan="6" style="background:#eef6ff;color:#1e3a8a;border-radius:6px;font-size:13px">🚚 <b>ชั่งรถ</b> · รถหนัก <b>${f2(l.heavy)}</b> − รถเบา <b>${f2(l.light)}</b> − หัก <b>${f2(l.tare||0)}</b> = สุทธิ <b>${f2(l.net)}</b> กก.</td></tr>`)})}
+  }catch(e){console.warn('[r24] showBill',e)}
+  return p};
+
+ // ---------- 4) ใบเสร็จ: รายการชั่งรถแสดง รถหนัก / รถเบา / หัก / สุทธิ ชัดเจน ----------
+ const SUM_SINGLE=false;
+ window.rcRows=function(rc){
+  const R=[],t=new Date(rc.ts).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'});
+  R.push({k:'c',a:rc.shop,bold:1,big:1},{k:'c',a:rc.title},{k:'l',a:'เลขที่ '+rc.no},{k:'l',a:'วันที่ '+t},{k:'l',a:'ผู้ขาย: '+rc.seller},{k:'l',a:'ผู้ชั่ง: '+rc.weigher+' ('+rc.scale+')'});
+  if(rc.note)R.push({k:'l',a:rc.note});
+  R.push({k:'hr'});
+  const G=new Map();
+  rc.lines.forEach(l=>{if(!G.has(l.name))G.set(l.name,[]);G.get(l.name).push(l)});
+  G.forEach((ls,name)=>{
+   R.push({k:'l',a:name,bold:1});
+   ls.forEach((l,i)=>{
+    const n=ls.length>1?(i+1)+') ':'';
+    if(l.pending){
+     R.push({k:'l',a:'  '+n+'ชั่งรถ: รถหนัก '+f2(l.heavy)+' กก.',small:1},{k:'l',a:'  (รอชั่งรถเบา)',small:1});return}
+    if(l.truck){
+     R.push({k:'l',a:'  '+n+'ชั่งรถ',small:1},
+      {k:'lr',a:'   รถหนัก',b:f2(l.heavy)+' กก.',small:1},
+      {k:'lr',a:'   รถเบา',b:' '+f2(l.light)+' กก.',small:1},
+      {k:'lr',a:'   หักน้ำหนัก',b:'- '+f2(l.tare||0)+' กก.',small:1},
+      {k:'lr',a:'  สุทธิ '+f2(l.net)+' กก. x '+f2(l.price),b:f2(l.amount),bold:1});
+     return}
+    R.push({k:'lr',a:'  '+n+f2(l.net)+' กก. x '+f2(l.price),b:f2(l.amount)});
+    R.push({k:'l',a:'  (รวม '+f2(l.gross)+' หัก '+f2(l.tare)+(l.pct?' เจือปน '+l.pct+'%':'')+')',small:1});
+   });
+   const done=ls.filter(l=>!l.pending);
+   if(done.length>1||(SUM_SINGLE&&done.length)){
+    const net=r2(done.reduce((a,l)=>a+(+l.net||0),0)),tare=r2(done.reduce((a,l)=>a+(+l.tare||0),0)),amt=r2(done.reduce((a,l)=>a+(+l.amount||0),0));
+    R.push({k:'lr',a:'  รวม '+done.length+' ครั้ง น้ำหนักสุทธิ',b:f2(net)+' กก.',bold:1},
+           {k:'lr',a:'  ภาชนะ/หักรวม',b:f2(tare)+' กก.',small:1},
+           {k:'lr',a:'  ยอดรวม '+name,b:f2(amt),bold:1});
+   }
+  });
+  R.push({k:'hr'},{k:'lr',a:'รวมสุทธิ',b:f2(rc.total)+' บาท',bold:1,big:1},{k:'sp'},{k:'l',a:'ลงชื่อผู้ขาย ______________'},{k:'sp'},{k:'c',a:'ขอบคุณที่ใช้บริการ',small:1});
+  return R};
+})();
+</script>
+ 
 <script>  
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
