@@ -175,7 +175,7 @@ async function boot(){try{Object.assign(S,JSON.parse(localStorage.getItem('mk_se
  ME=me;S.recorder=me.name;adm=me.role=='admin';cash=me.role!='clerk';$('login').style.display='none';$('who').innerHTML=esc(me.name)+'<br>'+RL[me.role]+'<br><small style="opacity:.6">v'+BUILD+'</small>';$('shopn').textContent=S.shop;
  document.querySelectorAll('nav button').forEach(b=>{if(!can(b.dataset.t))b.style.display='none'});document.querySelectorAll('.ng').forEach(g=>{g.style.display=TABS[ME.role].some(t=>(g.dataset.g=='front')==FRONT.includes(t))?'':'none'});
  await loadAll();scStatus();scAuto();prAuto();loadHolds();if(cash&&window.Notification&&Notification.permission=='default')Notification.requestPermission();
- sb.channel('bills-live').on('postgres_changes',{event:'*',schema:'public',table:'bills'},async pl=>{if(pl.eventType=='INSERT')await new Promise(r=>setTimeout(r,1500));await loadB();if(pl.eventType=='INSERT'&&cash)notifyBill(pl.new);if(cash&&$('admin').classList.contains('on'))rAdmin(true);if($('mine').classList.contains('on'))rMine();if($('dash').classList.contains('on'))rDash()}).subscribe();document.querySelector('nav button[data-t="'+TABS[ME.role][0]+'"]').click();setInterval(async()=>{if(!ME||document.hidden)return;await loadB();loadHolds();if(cash&&$('admin').classList.contains('on'))rAdmin(true);if($('mine').classList.contains('on'))rMine();if($('dash').classList.contains('on'))rDash()},15000)}
+ sb.channel('bills-live').on('postgres_changes',{event:'*',schema:'public',table:'bills'},async pl=>{if(pl.eventType=='INSERT')await new Promise(r=>setTimeout(r,1500));await loadB();if(pl.eventType=='INSERT'&&cash)notifyBill(pl.new);if(cash&&$('admin').classList.contains('on'))rAdmin(true);if($('mine').classList.contains('on'))rMine();if($('dash').classList.contains('on'))rDash()}).subscribe();document.querySelector('nav button[data-t="'+TABS[ME.role][0]+'"]').click();setInterval(async()=>{if(!ME||document.hidden)return;await loadB();loadHolds();if(cash&&$('admin').classList.contains('on'))rAdmin(true);if($('mine').classList.contains('on'))rMine();if($('dash').classList.contains('on'))rDash()},30000)}
 async function loadAll(){const[p,t]=await Promise.all([sb.from('products').select('*').eq('active',true).order('sort_order').order('code'),sb.from('tare_presets').select('*').order('name')]);
  P=(p.data||[]).map(x=>({id:x.id,code:x.code,name:x.name,price:+x.price_per_kg,cat:x.category||'อื่นๆ',color:x.color}));T=(t.data||[]).map(x=>({id:x.id,n:x.name,w:+x.weight_kg}));fillSel();NAMES=Object.fromEntries(((await sb.from('profiles').select('id,name')).data||[]).map(x=>[x.id,x.name]));await loadB()}
 const BSEL='*,bill_items(*),rec:profiles!bills_recorder_id_fkey(name),pay:profiles!bills_approved_by_fkey(name),vby:profiles!bills_voided_by_fkey(name)';
@@ -1060,7 +1060,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
    prods.map(([n,v])=>`<div style="font-weight:700">${esc(n)}</div>`+row('  '+f2(v.kg)+' กก.',f2(v.amt)+' บาท')).join('')+'<hr>'+row('พิมพ์เมื่อ',new Date().toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}))+`<div style="height:12px"></div><div>ลงชื่อผู้ปิดวัน ______________</div>`;
    printHtml(`<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700;900&display=swap" rel="stylesheet"><style>@page{size:${PR.w}mm auto;margin:0}html,body{margin:0}body{padding:2mm 3mm;width:${w}mm;font:12px/1.4 Prompt,sans-serif;color:#000}hr{border:0;border-top:1px dashed #000;margin:4px 0}.dp{font-weight:900;font-size:1.6em;line-height:0;padding:0 .06em}</style></head><body>${body}</body></html>`)}}
  // อัปเดตอัตโนมัติทุก 30 วินาที เมื่ออยู่หน้านี้และดูวันนี้
- setInterval(()=>{if(document.hidden||!$('close')?.classList.contains('on')||CS.d!=YMD(today0())||!$('mkCb'))return;closeLoad()},30000);
+ setInterval(()=>{if(document.hidden||!$('close')?.classList.contains('on')||CS.d!=YMD(today0())||!$('mkCb'))return;closeLoad()},180000);
  const css=document.createElement('style');css.textContent=`
  .mk-chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.mk-chips .chip{padding:7px 14px;min-height:0;font-size:14px}.mk-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
  .mk-svg text{fill:var(--m);font:11px Prompt,system-ui,sans-serif}.mk-svg .vl{fill:var(--t);font-size:10.5px;font-weight:600}.mk-svg .gl{stroke:var(--b);stroke-width:1}.mk-svg .bar{fill:var(--bl)}.mk-svg .ma{fill:none;stroke:#f59e0b;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.mk-svg .hv{fill:var(--bl);opacity:0}
@@ -1340,14 +1340,14 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
   PL=c=>[...(c.customer_plates||[])].sort((a,b)=>String(b.last_used_at||'').localeCompare(String(a.last_used_at||'')));
 
  // ---------- โหลดรายชื่อ (แคชในเครื่อง รีเฟรชทุก 60 วิ) ----------
- function load(force){if(!ME)return Promise.resolve();if(CU.p)return CU.p;if(!force&&Date.now()-CU.t<(CU.ok?60000:30000))return Promise.resolve();
+ function load(force){if(!ME)return Promise.resolve();if(CU.p)return CU.p;if(!force&&Date.now()-CU.t<(CU.ok?300000:30000))return Promise.resolve();
   CU.p=(async()=>{try{const out=[];for(let o=0;;o+=1000){const{data,error}=await sb.from('customers').select('id,name,customer_plates(id,plate,last_used_at)').order('name').range(o,o+999);if(error)throw error;out.push(...data);if(data.length<1000)break}
     out.sort((a,b)=>a.name.localeCompare(b.name,'th'));CU.list=out;CU.ok=true;CU.err=''}
    catch(e){CU.err=e.message||String(e);if(!CU.warned){CU.warned=1;console.warn('[customers] โหลดไม่ได้ (ต้อง Run migrate11.sql?):',CU.err)}}
    finally{CU.t=Date.now();CU.p=null}
    if($('cust')?.classList.contains('on'))listPaint()})();return CU.p}
  const iv=setInterval(()=>{if(ME){clearInterval(iv);load()}},1000);
- setInterval(()=>{if(ME&&!document.hidden)load()},60000);
+ setInterval(()=>{if(ME&&!document.hidden)load()},300000);
 
  // ---------- กล่องรายการ (dropdown) ----------
  let ac=null,acFor=null;
@@ -1634,8 +1634,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
-
- <script>
+<script>
 // ===== r24 add-on: เก็บ/แสดงรายละเอียดการชั่งรถ (รถหนัก, รถเบา, หัก, สุทธิ) ในบิลและใบเสร็จ =====
 (function(){
  if(window.__mk24)return;window.__mk24=1;
@@ -1716,7 +1715,8 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
   return R};
 })();
 </script>
- 
+
+
 <script>  
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
