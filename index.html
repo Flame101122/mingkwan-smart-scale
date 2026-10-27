@@ -1716,6 +1716,162 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+ <script>
+// ===== r25 add-on: "ตัดทศนิยมน้ำหนักจากตาชั่ง" รายสินค้า (แอดมินติ๊กที่ เมนูสต็อก > ✏️ แก้ไข) =====
+// - ใช้เฉพาะค่าที่ดึงจากตาชั่ง (gsrc='scale') ของสินค้าที่ติ๊ก "ตัดทศนิยม" : 13.09 -> 13.00, 13.05 -> 13.00 (ปัดลงเป็นจำนวนเต็ม กก.)
+// - สินค้าที่ไม่ติ๊ก (ค่าเริ่มต้นทุกตัว) ใช้ตามตาชั่งทุกทศนิยมเหมือนเดิม / พิมพ์น้ำหนักเองไม่ถูกตัด / ช่อง "ค่าจากตาชั่ง" ยังโชว์ค่าจริง
+// วางต่อท้ายสคริปต์ r24 และก่อน <script> ของ serviceWorker (ไม่แก้โค้ดเดิม)
+(function(){
+ if(window.__mk25)return;window.__mk25=1;
+ const trOf=pid=>{const p=P.find(x=>x.id==pid);return !!(p&&p.trunc)},cut=w=>Math.floor((+w||0)+1e-9);
+
+ // ---------- โหลดค่า trunc_dec มารวมกับ P ----------
+ async function pull(){if(!ME)return;
+  try{const{data,error}=await sb.from('products').select('id,trunc_dec');if(error){console.warn('[r25] trunc_dec:',error.message);return}
+   const M=new Map(data.map(x=>[x.id,!!x.trunc_dec]));P.forEach(p=>{p.trunc=M.get(p.id)||false});mark();ind()}catch(e){}}
+ const la0=window.loadAll;window.loadAll=async function(){const r=await la0.apply(this,arguments);await pull();return r};
+ setInterval(()=>{if(ME&&P.length&&P[0].trunc===undefined)pull()},1500);
+
+ // ---------- ตัดทศนิยมเมื่อค่ามาจากตาชั่ง ----------
+ function apply(){const g=$('gross');if(!g||gsrc!=='scale'||!trOf($('pid').value))return;
+  const v=parseFloat(g.value);if(!isFinite(v))return;const c=cut(v);
+  if(c!==v){g.value=String(c);calc();const t=$('mkTr');if(t)t.textContent='✂ ตัดทศนิยม: ตาชั่ง '+f2(v)+' → ใช้ '+f2(c)+' กก.'}}
+ const sf0=window.scFeed;window.scFeed=function(){const r=sf0.apply(this,arguments);try{if($('wd').open)apply()}catch(e){}return r};
+ const ul0=window.useLive;window.useLive=function(){const r=ul0.apply(this,arguments);try{apply()}catch(e){}return r};
+
+ // ---------- ป้ายบอกในหน้าต่างชั่ง ----------
+ function ind(){const live=$('live');if(!live)return;let t=$('mkTr');
+  if(!t){live.insertAdjacentHTML('afterend','<div id="mkTr" class="m" style="text-align:center;color:#b45309;font-weight:700;display:none"></div>');t=$('mkTr')}
+  if(trOf($('pid').value)){t.style.display='';t.textContent='✂ สินค้านี้ตั้งให้ตัดทศนิยมน้ำหนักจากตาชั่ง'}else t.style.display='none'}
+ const ow0=window.openW;window.openW=function(){const r=ow0.apply(this,arguments);try{ind()}catch(e){}return r};
+
+ // ---------- เมนูสต็อก: เครื่องหมาย ✂ + ช่องติ๊กในหน้าต่างแก้ไข (แอดมิน) ----------
+ function mark(){const t=$('stt');if(!t)return;
+  t.querySelectorAll('tr').forEach(tr=>{if(tr.querySelector('th')||tr.cells.length<2)return;const p=P.find(x=>x.code==tr.cells[0].textContent.trim());
+   if(p&&p.trunc&&!tr.cells[1].querySelector('.mk-cut'))tr.cells[1].insertAdjacentHTML('beforeend',' <span class="mk-cut" title="ตัดทศนิยมน้ำหนักจากตาชั่ง">✂</span>')})}
+ const st0=window.stockTbl;window.stockTbl=function(){const r=st0.apply(this,arguments);try{mark()}catch(e){}return r};
+ const ep0=window.editProd;
+ window.editProd=function(id){const r=ep0.apply(this,arguments);
+  try{const d=document.querySelector('#ep1')?.closest('dialog'),p=P.find(x=>x.id==id),sv=d&&d.querySelector('.s');if(!d||!p||!sv||d.querySelector('#mkTd'))return r;
+   sv.parentElement.insertAdjacentHTML('beforebegin',`<label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px"><input type="checkbox" id="mkTd" style="width:auto;margin-top:4px"${p.trunc?' checked':''}><span><b>✂ ตัดทศนิยมน้ำหนักจากตาชั่ง</b><br><span class="m">ติ๊ก = ปัดลงเป็นจำนวนเต็ม กก. (13.09 → 13.00) · ไม่ติ๊ก = ใช้ตามตาชั่งทุกทศนิยม</span></span></label>`);
+   sv.addEventListener('click',async()=>{const chk=d.querySelector('#mkTd').checked,code=d.querySelector('#ep1').value.trim(),name=d.querySelector('#ep2').value.trim(),price=+d.querySelector('#ep5').value;
+    if(!code||!name||!(price>=0)||chk===!!p.trunc)return;
+    const{error}=await sb.from('products').update({trunc_dec:chk}).eq('id',id);
+    if(error)return toast('บันทึกการตัดทศนิยมไม่สำเร็จ: '+error.message,8000);
+    await pull();if($('stock').classList.contains('on')&&typeof rStock=='function')rStock();toast(chk?'✂ ตั้งให้สินค้านี้ตัดทศนิยมแล้ว':'ยกเลิกการตัดทศนิยมของสินค้านี้แล้ว')})}catch(e){console.warn('[r25]',e)}
+  return r};
+})();
+</script>
+
+<script>
+// ===== r26 add-on: แอดมินแก้ไขบิล/เพิ่มสินค้า + ส่งคืนบิลให้ผู้ชั่ง (สถานะ "ตีคืนแก้ไข") =====
+// ต้อง Run migrate13_return_edit.sql ก่อน | วางต่อท้าย r25 และก่อน <script> ของ serviceWorker (ไม่แก้โค้ดเดิม)
+(function(){
+ if(window.__mk26)return;window.__mk26=1;
+ const isData=x=>String(x||'').startsWith('data:');
+ STG.returned=['↩️','ตีคืนแก้ไข','#8b5cf6'];
+
+ // ---------- แสดงสถานะใหม่ ----------
+ const sh0=window.stageHtml;window.stageHtml=function(b){let h=sh0.apply(this,arguments);if(b&&b.status=='returned'&&b.rnote)h=h.replace('</span>',' · '+esc(b.rnote)+'</span>');return h};
+ const sp0=window.stepsHtml;window.stepsHtml=function(b){return b&&b.status=='returned'?'<span class="m">ส่งบิล ✔ → ตีคืนให้แก้ไข ↩ → รอผู้ชั่งแก้แล้วส่งใหม่</span>':sp0.apply(this,arguments)};
+ const mb0=window.mapBill;window.mapBill=function(b){const o=mb0.apply(this,arguments);o.rnote=b.return_note||'';o.rts=b.returned_at?Date.parse(b.returned_at):0;return o};
+ const nm0=window.notifyMine;window.notifyMine=function(b){if(b.status!='returned')return nm0.apply(this,arguments);
+  const k='m'+b.id+'returned'+b.rts;if(NOTI.has(k))return;NOTI.add(k);beep('new');toast('↩️ บิล '+b.no+' ('+b.seller+') ถูกตีคืนให้แก้ไข'+(b.rnote?' — '+b.rnote:''),12000)};
+ // ผู้จ่ายเงิน/แอดมินได้รับแจ้งเมื่อผู้ชั่งแก้ไขแล้วส่งกลับมา
+ const lb0=window.loadB;window.loadB=async function(){const prev=Object.fromEntries(B.map(b=>[b.id,b.status])),r=await lb0.apply(this,arguments);
+  try{if(ME&&cash)B.forEach(b=>{if(prev[b.id]=='returned'&&b.status=='pending'){beep('new');toast('🔔 บิล '+b.no+' ('+b.seller+') ผู้ชั่งแก้ไขแล้วส่งกลับมาให้จ่าย · ฿'+f2(b.total),9000)}})}catch(e){}return r};
+
+ // ---------- กล่อง "บิลที่ถูกตีคืน" หน้าชั่ง ----------
+ function retCard(){if(!ME)return;const L=B.filter(b=>b.status=='returned'&&(b.rid==ME.id||adm));let el=$('mkRet');const anchor=$('mybills')||document.querySelector('#weigh .card.cg');
+  if(!el){if(!anchor)return;el=document.createElement('div');el.id='mkRet';anchor.insertAdjacentElement('beforebegin',el)}
+  el.className=L.length?'card':'';el.style.cssText=L.length?'border-left:6px solid #8b5cf6':'';
+  el.innerHTML=L.length?'<b>↩️ บิลที่ถูกตีคืนให้แก้ไข ('+L.length+')</b>'+L.map(b=>`<div class="row2" style="align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px dashed var(--b)"><span><b>${esc(b.no)}</b> · ${esc(b.seller)} · ฿${f2(b.total)}<br><span class="m">${adm?'ผู้ชั่ง '+esc(b.recorder)+' · ':''}เหตุผล: ${esc(b.rnote||'-')}</span></span><span style="white-space:nowrap"><button onclick="showBill('${b.id}')">ดู</button> <button class="bt-blue" onclick="mkEd.start('${b.id}')">✏️ แก้ไข / ชั่งใหม่</button></span></div>`).join(''):''}
+ const rm0=window.rMyBills;window.rMyBills=function(){const r=rm0.apply(this,arguments);try{retCard()}catch(e){}return r};
+
+ // ---------- ปุ่มในหน้าต่างบิล ----------
+ const shb0=window.showBill;
+ window.showBill=function(id){const p=shb0.apply(this,arguments);
+  try{const b=B.find(x=>x.id==id)||HB.find(x=>x.id==id),d=document.getElementById('bdlg');if(!b||!d||d.querySelector('.mk-ed-row'))return p;
+   const a=adm&&(b.status=='pending'||b.status=='returned'),m=ME&&b.status=='returned'&&b.rid==ME.id;
+   if(b.status=='returned')d.querySelector('.m')?.insertAdjacentHTML('afterend','<div style="color:#6d28d9;font-weight:700;margin:4px 0">↩️ ตีคืนแก้ไข: '+esc(b.rnote||'-')+'</div>');
+   if(a||m)d.insertAdjacentHTML('beforeend',`<div class="row mk-ed-row" style="margin-top:6px"><button class="bt-blue" onclick="mkEd.start('${b.id}')">${a?'✏️ แก้ไขบิล / เพิ่มสินค้า':'✏️ แก้ไข / ชั่งใหม่ แล้วส่งอีกครั้ง'}</button>${a&&b.status=='pending'?`<button class="bt-or" onclick="mkEd.ret('${b.id}')">↩ ส่งคืนผู้ชั่ง</button>`:''}</div>`)
+  }catch(e){console.warn('[r26] showBill',e)}return p};
+
+ // ---------- เริ่มแก้ไข: โหลดบิลเข้าหน้าชั่ง ----------
+ async function start(id){
+  if(!ME)return;
+  if(cur.editId)return toast('กำลังแก้ไขบิล '+cur.editNo+' อยู่แล้ว — บันทึกหรือยกเลิกก่อน',6000);
+  if(cur.lines.length)return toast('บิลปัจจุบันยังมีรายการอยู่ — บันทึก/พัก/เก็บบิลก่อนเปิดแก้ไขบิลอื่น',7000);
+  const{data:b,error}=await sb.from('bills').select('*,bill_items(*)').eq('id',id).single();
+  if(error)return toast('โหลดบิลไม่ได้: '+error.message,7000);
+  if(!(adm&&(b.status=='pending'||b.status=='returned'))&&!(b.recorder_id==ME.id&&b.status=='returned'))return toast('บิลนี้แก้ไขไม่ได้ (สถานะ '+b.status+')',6000);
+  const{data:ph}=await sb.from('bill_photos').select('path,product_name').eq('bill_id',id);
+  const pn=x=>{const m=/\/p(\d+)\.jpg$/.exec(x.path);return m?+m[1]:1e9},rows=(ph||[]).map((x,i)=>({...x,i})).sort((a,b)=>pn(a)-pn(b)||a.i-b.i),by={},used=new Set(),Q={};
+  rows.forEach(x=>{const k=x.product_name||'';(by[k]=by[k]||[]).push(x.path)});
+  try{const{data:u}=await sb.storage.from('bill-photos').createSignedUrls(rows.map(x=>x.path),3600);(u||[]).forEach(x=>{if(x.signedUrl)PHU[x.path]=x.signedUrl})}catch(e){}
+  const all=n=>{const a=by[n]||[];a.forEach(p=>used.add(p));return[...a]},one=n=>{const a=Q[n]||(Q[n]=[...(by[n]||[])]),p=a.shift();if(p)used.add(p);return p||null};
+  const lines=(b.bill_items||[]).map(i=>{const base={pid:i.product_id,name:i.product_name,price:+i.price_per_kg};
+   if(i.heavy_kg!=null&&i.light_kg!=null)return{...base,kind:'truck',heavy:+i.heavy_kg,light:+i.light_kg,deduct:+i.tare_kg||0,net:+i.net_kg,amount:+i.amount,ph:one(i.product_name+' · รถหนัก'),pl:one(i.product_name+' · รถเบา')};
+   const ps=all(i.product_name);
+   return{...base,kind:'small',code:'',gross:+i.gross_kg,tare:+i.tare_kg,pct:+i.impurity_pct||0,net:+i.net_kg,amount:+i.amount,photos:ps,photo:ps[0]||null,src:i.weight_src||'manual',ts:'0',tq:'1',tx:String(+i.tare_kg||0)}});
+  const extraPh=rows.filter(x=>!used.has(x.path)).map(x=>({path:x.path,product_name:x.product_name})),m=/รถทะเบียน\s*([^·]+)/.exec(b.note||''),plate=m?m[1].trim():'';
+  cur={lines,photos:[],plate,holdId:null,label:'',editId:id,editNo:b.bill_no,editNote:b.note||'',editStatus:b.status,extraPh};
+  $('seller').value=b.seller_name=='ลูกค้าทั่วไป'?'':b.seller_name;$('plate').value=plate;
+  document.getElementById('bdlg')?.remove();document.querySelector('nav button[data-t="weigh"]')?.click();rLines();
+  toast('✏️ เปิดแก้ไขบิล '+b.bill_no+' แล้ว — แก้/ลบ/เพิ่มสินค้าได้ปกติ แล้วกด "บันทึก / ส่งจ่าย"',8000)}
+
+ // ---------- แถบแจ้งโหมดแก้ไข ----------
+ const rl0=window.rLines;
+ window.rLines=function(){const r=rl0.apply(this,arguments);try{bar()}catch(e){}return r};
+ function bar(){const card=document.querySelector('#weigh .posR.bill');if(!card)return;let el=$('mkEdBar');
+  if(!cur.editId){if(el)el.remove();return}
+  if(!el){el=document.createElement('div');el.id='mkEdBar';el.style.cssText='background:#ede9fe;color:#4c1d95;border:1px solid #c4b5fd;border-radius:10px;padding:8px 10px;margin:0 0 8px';card.querySelector('.bh').insertAdjacentElement('afterend',el)}
+  el.innerHTML='<b>✏️ กำลังแก้ไขบิล '+esc(cur.editNo)+'</b><div style="font-size:13px">'+(adm?'บันทึกแล้วบิลเดิมถูกแทนที่ด้วยรายการนี้ (ยังเป็นสถานะรอจ่าย)':'บันทึกแล้วบิลจะถูกส่งกลับไปให้ผู้จ่ายเงินอีกครั้ง')+'</div><button type="button" style="margin-top:6px" onclick="mkEd.cancel()">✖ ยกเลิกการแก้ไข</button>';
+  $('bno').textContent='แก้ไข '+cur.editNo;const t=$('tkbno');if(t)t.textContent=$('bno').textContent}
+ async function cancel(){if(!cur.editId)return;if(await dlg('ยกเลิกการแก้ไขบิล '+cur.editNo+'? (บิลเดิมในระบบไม่เปลี่ยน)',{ok:'ยกเลิกการแก้ไข',danger:true}))resetBill()}
+
+ // ---------- บันทึกบิลที่แก้ไข ----------
+ async function saveEdited(){
+  if(saving)return;if(!cur.lines.length)return toast('ยังไม่มีรายการ');
+  if(cur.lines.some(l=>l.kind=='truck'&&l.net==null))return toast('ยังมีรายการชั่งรถที่รอชั่งรถเบา — ชั่งรถเบาให้เสร็จก่อน',8000);
+  saving=true;
+  try{const id=cur.editId,items=[],photos=[],seen=new Set();
+   const addPh=(p,n)=>{if(!p)return;const k=p+'|'+n;if(seen.has(k))return;seen.add(k);photos.push({path:p,product_name:n})};
+   const up=async x=>{if(!isData(x))return x;const path=await upPhoto(x,id+'/e'+uid()+'.jpg');PHU[path]=x;return path};
+   for(const l of cur.lines){
+    if(l.kind=='truck'){l.ph=await up(l.ph);l.pl=await up(l.pl);addPh(l.ph,l.name+' · รถหนัก');addPh(l.pl,l.name+' · รถเบา');
+     items.push({product_id:l.pid,product_name:l.name,price_per_kg:l.price,gross_kg:r2(l.heavy-l.light),tare_kg:l.deduct||0,impurity_pct:0,net_kg:l.net,amount:l.amount,weight_src:'manual',heavy_kg:l.heavy,light_kg:l.light})}
+    else{const ps=[];for(const x of(l.photos||[l.photo]))if(x)ps.push(await up(x));l.photos=ps;l.photo=ps[0];ps.forEach(p=>addPh(p,l.name));
+     items.push({product_id:l.pid,product_name:l.name,price_per_kg:l.price,gross_kg:l.gross,tare_kg:l.tare,impurity_pct:l.pct||0,net_kg:l.net,amount:l.amount,weight_src:l.src||'manual'})}}
+   (cur.extraPh||[]).forEach(x=>addPh(x.path,x.product_name));
+   const segs=(cur.editNote||'').split(' · ').filter(s=>s&&!s.startsWith('รถทะเบียน')&&!s.startsWith('แก้ไขโดย'));if(cur.plate)segs.unshift('รถทะเบียน '+cur.plate);segs.push('แก้ไขโดย '+ME.name);
+   const{error}=await sb.rpc('edit_bill',{p_id:id,p_seller:$('seller').value.trim()||'ลูกค้าทั่วไป',p_note:segs.join(' · '),p_items:items,p_photos:photos,p_resubmit:!adm});
+   if(error)throw new Error(/edit_bill/.test(error.message)&&/function|schema cache/i.test(error.message)?'ยังไม่ได้ Run migrate13_return_edit.sql ใน Supabase':error.message);
+   const no=cur.editNo;resetBill();await loadB();
+   toast(adm?'✅ แก้ไขบิล '+no+' แล้ว — ไปที่ "จ่ายเงิน/อนุมัติ" เพื่อตรวจและจ่าย':'✅ แก้ไขบิล '+no+' แล้ว ส่งกลับให้ผู้จ่ายเงินเรียบร้อย',8000);
+   if(adm)document.querySelector('nav button[data-t="admin"]')?.click()
+  }catch(e){toast('บันทึกการแก้ไขไม่สำเร็จ: '+(e.message||e),10000)}finally{saving=false}}
+ const sv0=window.saveBill;window.saveBill=function(){return cur.editId?saveEdited():sv0.apply(this,arguments)};
+ // ระหว่างแก้ไขบิล ห้ามพัก/เก็บ (กันเกิดบิลซ้ำ)
+ const blk=()=>toast('กำลังแก้ไขบิล '+cur.editNo+' — พัก/เก็บบิลไม่ได้ กด "บันทึก" หรือ "ยกเลิกการแก้ไข" ก่อน',7000);
+ const hb0=window.holdBill;window.holdBill=function(){return cur.editId?blk():hb0.apply(this,arguments)};
+ if(typeof window.stashBill=='function'){const sb0=window.stashBill;window.stashBill=function(){return cur.editId?blk():sb0.apply(this,arguments)}}
+
+ // ---------- ส่งคืนบิล ----------
+ async function ret(id){const b=B.find(x=>x.id==id);if(!b)return;
+  const r=await dlg('ส่งคืนบิล '+b.no+' ให้ '+(b.recorder||'ผู้ชั่ง')+' แก้ไข (ระบุเหตุผล)',{input:true,ok:'↩ ส่งคืนบิล',ph:'เช่น สินค้าไม่ตรงกับรูป / น้ำหนักผิด'});if(!r)return;
+  const{error}=await sb.rpc('return_bill',{p_id:id,p_reason:r});
+  if(error)return toast('ส่งคืนไม่สำเร็จ: '+(/return_bill/.test(error.message)&&/function|schema cache/i.test(error.message)?'ยังไม่ได้ Run migrate13_return_edit.sql':error.message),9000);
+  document.getElementById('bdlg')?.remove();await loadB();if($('audit').classList.contains('on'))rAudit();else rAdmin();toast('↩ ส่งคืนบิล '+b.no+' ให้ผู้ชั่งแล้ว',6000)}
+
+ window.mkEd={start,cancel,ret};
+ // ตัวเลือกสถานะ "ตีคืน" ในตัวกรองหน้าจ่ายเงิน
+ const ra0=window.rAdmin;window.rAdmin=function(){const r=ra0.apply(this,arguments);try{const s=$('fs');if(s&&!s.querySelector('[value=returned]')){s.insertAdjacentHTML('beforeend','<option value="returned">ตีคืนแก้ไข</option>');s.value=$('admin').dataset.fs??'pending'}
+   if(s&&$('admin').dataset.fs=='returned'){/* ตารางใช้ ST[b.status] เดิม จึงเติมป้ายให้แถวที่ตีคืน */document.querySelectorAll('#bl .bd.returned').forEach(x=>{x.textContent='ตีคืนแก้ไข';x.style.background='#8b5cf6'})}}catch(e){}return r};
+})();
+</script>
+ 
+
 
 <script>  
 if ('serviceWorker' in navigator) {
