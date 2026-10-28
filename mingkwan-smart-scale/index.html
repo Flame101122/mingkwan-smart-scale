@@ -1879,6 +1879,60 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+ <script>
+// ===== r28 add-on: บิลใหม่ขึ้นหน้าแอดมินทันที (realtime มั่นคง + polling สำรองเร็ว + เชื่อมต่อใหม่อัตโนมัติ) =====
+(function(){
+ if(window.__mk28)return;window.__mk28=1;
+ let ch=null,retry=0,rt=null,busy=false,lastSig='';
+
+ const sig=()=>B.map(b=>b.id+':'+b.status+':'+b.total).join('|');
+
+ // โหลดบิลแล้ววาดหน้าที่เปิดอยู่ใหม่ ถ้ามีอะไรเปลี่ยน
+ async function refresh(force){
+  if(!ME||busy)return;busy=true;
+  try{
+   await loadB();
+   const s=sig();
+   if(force||s!==lastSig){
+    lastSig=s;
+    if(cash&&$('admin').classList.contains('on'))rAdmin(true);
+    if($('mine').classList.contains('on'))rMine();
+    if($('dash').classList.contains('on'))rDash();
+   }
+  }catch(e){console.warn('[r28] refresh',e)}
+  finally{busy=false}
+ }
+
+ // ---------- realtime ช่องใหม่ + ต่อใหม่เมื่อหลุด ----------
+ function connect(){
+  if(!ME)return;
+  clearTimeout(rt);
+  try{if(ch)sb.removeChannel(ch)}catch(e){}
+  ch=sb.channel('bills-live2-'+Math.random().toString(36).slice(2,6))
+   .on('postgres_changes',{event:'*',schema:'public',table:'bills'},async pl=>{
+     // รอให้ bill_items เขียนเสร็จ แล้วโหลดซ้ำ 2 รอบกันตกหล่น
+     if(pl.eventType=='INSERT'){await new Promise(r=>setTimeout(r,1200));await refresh(true);setTimeout(()=>refresh(true),2500)}
+     else refresh(true)})
+   .on('postgres_changes',{event:'INSERT',schema:'public',table:'bill_items'},()=>{setTimeout(()=>refresh(true),600)})
+   .subscribe(st=>{
+     if(st=='SUBSCRIBED'){retry=0;console.log('[r28] realtime connected')}
+     else if(st=='CHANNEL_ERROR'||st=='TIMED_OUT'||st=='CLOSED'){
+       retry++;console.warn('[r28] realtime',st,'retry',retry);
+       clearTimeout(rt);rt=setTimeout(connect,Math.min(1000*retry,15000))}});
+ }
+ const w=setInterval(()=>{if(ME){clearInterval(w);connect();lastSig=sig()}},800);
+
+ // ---------- polling สำรอง: ทุก 5 วินาที (เบา ดึงแค่ 300 บิลล่าสุด) ----------
+ setInterval(()=>{if(!ME||document.hidden)return;refresh(false)},5000);
+
+ // ---------- กลับมาเปิดหน้า / เน็ตกลับ / โฟกัสหน้าต่าง: ต่อ realtime ใหม่ + โหลดทันที ----------
+ const wake=()=>{if(!ME)return;connect();refresh(true)};
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)wake()});
+ addEventListener('online',wake);
+ addEventListener('focus',()=>{if(ME)refresh(false)});
+})();
+</script>
+
 <script>  
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
