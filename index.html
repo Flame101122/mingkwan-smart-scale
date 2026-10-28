@@ -1653,7 +1653,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
    if(ext!==rows&&/heavy_kg|light_kg/.test(String(e&&e.message))){
     console.warn('[r24] ยังไม่มีคอลัมน์ heavy_kg/light_kg (Run migrate12.sql)');
     return ii0.call(this,rows)}
-   throw e}};
+    throw e}};
 
  // ---------- 2) ตอนโหลดบิล: ใส่ข้อมูลรถหนัก/เบากลับเข้า line ----------
  const mb0=window.mapBill;
@@ -1716,7 +1716,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
- <script>
+<script>
 // ===== r25 add-on: "ตัดทศนิยมน้ำหนักจากตาชั่ง" รายสินค้า (แอดมินติ๊กที่ เมนูสต็อก > ✏️ แก้ไข) =====
 // - ใช้เฉพาะค่าที่ดึงจากตาชั่ง (gsrc='scale') ของสินค้าที่ติ๊ก "ตัดทศนิยม" : 13.09 -> 13.00, 13.05 -> 13.00 (ปัดลงเป็นจำนวนเต็ม กก.)
 // - สินค้าที่ไม่ติ๊ก (ค่าเริ่มต้นทุกตัว) ใช้ตามตาชั่งทุกทศนิยมเหมือนเดิม / พิมพ์น้ำหนักเองไม่ถูกตัด / ช่อง "ค่าจากตาชั่ง" ยังโชว์ค่าจริง
@@ -1794,7 +1794,15 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
   try{const b=B.find(x=>x.id==id)||HB.find(x=>x.id==id),d=document.getElementById('bdlg');if(!b||!d||d.querySelector('.mk-ed-row'))return p;
    const a=adm&&(b.status=='pending'||b.status=='returned'),m=ME&&b.status=='returned'&&b.rid==ME.id;
    if(b.status=='returned')d.querySelector('.m')?.insertAdjacentHTML('afterend','<div style="color:#6d28d9;font-weight:700;margin:4px 0">↩️ ตีคืนแก้ไข: '+esc(b.rnote||'-')+'</div>');
-   if(a||m)d.insertAdjacentHTML('beforeend',`<div class="row mk-ed-row" style="margin-top:6px"><button class="bt-blue" onclick="mkEd.start('${b.id}')">${a?'✏️ แก้ไขบิล / เพิ่มสินค้า':'✏️ แก้ไข / ชั่งใหม่ แล้วส่งอีกครั้ง'}</button>${a&&b.status=='pending'?`<button class="bt-or" onclick="mkEd.ret('${b.id}')">↩ ส่งคืนผู้ชั่ง</button>`:''}</div>`)
+   const ap=d.querySelector('button.pri'),row=d.querySelector('.row'),W='flex:1 1 0;min-height:52px;font-size:17px';
+   // แถวบน: ส่งคืนผู้ชั่ง ไปอยู่ตำแหน่งเดิมของปุ่มอนุมัติ
+   if(a&&b.status=='pending')row.insertAdjacentHTML('beforeend',`<button class="bt-or" style="flex:0 0 auto" onclick="mkEd.ret('${b.id}')">↩ ส่งคืนผู้ชั่ง</button>`);
+   // แถวล่าง: แก้ไขบิล (ซ้าย) + อนุมัติ/จ่ายเงิน (ขวา ใหญ่กว่าเล็กน้อย)
+   const w=document.createElement('div');w.className='mk-ed-row';w.style.cssText='display:flex;gap:6px;margin-top:6px';
+   if(a)w.insertAdjacentHTML('beforeend',`<button class="bt-blue" style="${W}" onclick="mkEd.start('${b.id}')">✏️ แก้ไขบิล</button>`);
+   else if(m)w.insertAdjacentHTML('beforeend',`<button class="bt-blue" style="${W}" onclick="mkEd.start('${b.id}')">✏️ แก้ไข / ชั่งใหม่ แล้วส่งอีกครั้ง</button>`);
+   if(ap&&b.status=='pending'){ap.style.cssText=W.replace('flex:1 1 0','flex:1.3 1 0')+';font-weight:700';w.appendChild(ap)}
+   if(w.children.length)d.appendChild(w);
   }catch(e){console.warn('[r26] showBill',e)}return p};
 
  // ---------- เริ่มแก้ไข: โหลดบิลเข้าหน้าชั่ง ----------
@@ -1845,7 +1853,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
      items.push({product_id:l.pid,product_name:l.name,price_per_kg:l.price,gross_kg:l.gross,tare_kg:l.tare,impurity_pct:l.pct||0,net_kg:l.net,amount:l.amount,weight_src:l.src||'manual'})}}
    (cur.extraPh||[]).forEach(x=>addPh(x.path,x.product_name));
    const segs=(cur.editNote||'').split(' · ').filter(s=>s&&!s.startsWith('รถทะเบียน')&&!s.startsWith('แก้ไขโดย'));if(cur.plate)segs.unshift('รถทะเบียน '+cur.plate);segs.push('แก้ไขโดย '+ME.name);
-   const{error}=await sb.rpc('edit_bill',{p_id:id,p_seller:$('seller').value.trim()||'ลูกค้าทั่วไป',p_note:segs.join(' · '),p_items:items,p_photos:photos,p_resubmit:!adm});
+   const{error}=await sb.rpc('edit_bill',{p_id:id,p_seller:$('seller').value.trim()||'ลูกค้าทั่วไป',p_note:segs.join(' · '),p_items:items,p_photos:photos,p_resubmit:true});
    if(error)throw new Error(/edit_bill/.test(error.message)&&/function|schema cache/i.test(error.message)?'ยังไม่ได้ Run migrate13_return_edit.sql ใน Supabase':error.message);
    const no=cur.editNo;resetBill();await loadB();
    toast(adm?'✅ แก้ไขบิล '+no+' แล้ว — ไปที่ "จ่ายเงิน/อนุมัติ" เพื่อตรวจและจ่าย':'✅ แก้ไขบิล '+no+' แล้ว ส่งกลับให้ผู้จ่ายเงินเรียบร้อย',8000);
@@ -1859,7 +1867,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 
  // ---------- ส่งคืนบิล ----------
  async function ret(id){const b=B.find(x=>x.id==id);if(!b)return;
-  const r=await dlg('ส่งคืนบิล '+b.no+' ให้ '+(b.recorder||'ผู้ชั่ง')+' แก้ไข (ระบุเหตุผล)',{input:true,ok:'↩ ส่งคืนบิล',ph:'เช่น สินค้าไม่ตรงกับรูป / น้ำหนักผิด'});if(!r)return;
+  const r=await dlg('ยืนยันส่งคืนบิล '+b.no+' ให้ '+(b.recorder||'ผู้ชั่ง')+' แก้ไขใช่หรือไม่? (ระบุเหตุผลก่อนกดยืนยัน)',{input:true,ok:'✔ ยืนยันส่งคืน',no:'ยกเลิก',danger:true,ph:'เช่น สินค้าไม่ตรงกับรูป / น้ำหนักผิด'});if(!r)return;
   const{error}=await sb.rpc('return_bill',{p_id:id,p_reason:r});
   if(error)return toast('ส่งคืนไม่สำเร็จ: '+(/return_bill/.test(error.message)&&/function|schema cache/i.test(error.message)?'ยังไม่ได้ Run migrate13_return_edit.sql':error.message),9000);
   document.getElementById('bdlg')?.remove();await loadB();if($('audit').classList.contains('on'))rAudit();else rAdmin();toast('↩ ส่งคืนบิล '+b.no+' ให้ผู้ชั่งแล้ว',6000)}
@@ -1870,8 +1878,6 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
    if(s&&$('admin').dataset.fs=='returned'){/* ตารางใช้ ST[b.status] เดิม จึงเติมป้ายให้แถวที่ตีคืน */document.querySelectorAll('#bl .bd.returned').forEach(x=>{x.textContent='ตีคืนแก้ไข';x.style.background='#8b5cf6'})}}catch(e){}return r};
 })();
 </script>
- 
-
 
 <script>  
 if ('serviceWorker' in navigator) {
