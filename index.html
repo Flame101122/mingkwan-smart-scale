@@ -1933,6 +1933,90 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+ <script>
+// ===== r29 add-on: ชั่งรถ (รถหนัก/รถเบา) ถ่ายรูปเพิ่มได้หลายรูป + ลบรูปได้ เหมือนหน้าชั่งปกติ =====
+(function(){
+ if(window.__mk29)return;window.__mk29=1;
+ const isData=x=>String(x||'').startsWith('data:');
+
+ // ---------- กล่องรูป: ปุ่ม 📷 ถ่ายเพิ่ม + รูปย่อพร้อมปุ่ม ✕ ลบ ----------
+ function photoBox(host,list,getVideo,getW){
+  const wrap=document.createElement('div');
+  wrap.innerHTML='<button type="button" class="pb-add" style="width:100%;margin-top:6px">📷 ถ่ายเพิ่ม</button><div class="ph pb-list"></div>';
+  host.appendChild(wrap);
+  const box=wrap.querySelector('.pb-list');
+  const draw=()=>{box.innerHTML=list.map((p,i)=>`<div class="pth"><img class="img-view-thumb" src="${phUrl(p)}" alt="รูปที่ ${i+1}" title="กดเพื่อดูรูปใหญ่" tabindex="0"><button type="button" aria-label="ลบรูป" data-i="${i}">✕</button></div>`).join('')};
+  box.onclick=e=>{const b=e.target.closest('button[data-i]');if(!b)return;list.splice(+b.dataset.i,1);draw()};
+  wrap.querySelector('.pb-add').onclick=()=>{const s=shotFrom(getVideo(),getW());if(!s)return toast('กล้องยังไม่พร้อม');list.push(s);draw()};
+  draw();
+  return{draw,snapIfEmpty:()=>{if(!list.length){const s=shotFrom(getVideo(),getW());if(s)list.push(s)}return list.length}}}
+
+ // ---------- หน้าต่างกรอกน้ำหนัก (เขียนทับของเดิม) : รองรับหลายรูป ----------
+ window.numDlg=function({title,sub='',ok='ตกลง',skip='',cam=true,photos=[]}){return new Promise(async r=>{
+  const K=['7','8','9','4','5','6','1','2','3','.','0','<'],d=document.createElement('dialog'),list=[...photos];
+  d.style.cssText='max-width:480px;width:94%;border-radius:14px;background:var(--c);color:var(--t);text-align:center';
+  d.innerHTML=`<h2 style="margin:4px 0">${esc(title)}</h2><div class="m">${esc(sub)}</div>${cam?'<video autoplay playsinline muted style="margin-top:8px;max-height:150px"></video><div class="pbx"></div>':''}<input class="nd" inputmode="none" style="font-size:34px;font-weight:800;text-align:center;margin:8px 0"><div class="np">${K.map(k=>`<button>${k=='<'?'⌫':k}</button>`).join('')}</div><div class="row" style="margin-top:8px"><button class="b1">${skip?esc(skip):'ยกเลิก'}</button><button class="pri b2">${esc(ok)}</button></div>`;
+  document.body.appendChild(d);d.showModal();
+  const inp=d.querySelector('.nd'),v=d.querySelector('video'),done=x=>{d.remove();r(x)};
+  const pb=cam?photoBox(d.querySelector('.pbx'),list,()=>v,()=>parseFloat(inp.value)||0):null;
+  d.querySelectorAll('.np button').forEach((b,i)=>b.onclick=()=>{const k=K[i];let t=inp.value;inp.value=k=='<'?t.slice(0,-1):k=='.'?(t.includes('.')?t:(t||'0')+'.'):t+k});
+  d.oncancel=()=>done(null);d.querySelector('.b1').onclick=()=>done(skip?{skip:true}:null);
+  d.querySelector('.b2').onclick=()=>{const x=parseFloat(inp.value);if(!(x>0))return toast('กรอกน้ำหนักให้ถูกต้อง');
+   if(cam&&!pb.snapIfEmpty())return toast('ต้องมีรูปอย่างน้อย 1 รูป (กล้องยังไม่พร้อม)');
+   done({v:x,photo:list[0]||null,photos:[...list]})};
+  if(cam){if(!stream)await startCam();if(stream){v.srcObject=stream;v.play().catch(()=>{})}}inp.focus()})};
+
+ // ---------- เพิ่มรายการชั่งรถ / ชั่งรถเบา : เก็บรูปแรกใน ph/pl และรูปเพิ่มใน phx/plx ----------
+ window.addTruck=async function(){if(!await needPlate())return;const p=await pickProd();if(!p)return;if(p.price<=0)return toast('สินค้านี้ยังไม่ได้ตั้งราคา');
+  const h=await numDlg({title:'น้ำหนักรถหนัก',sub:p.name+' · กรอกน้ำหนักรถก่อนลงสินค้า (ดูจากกิโลใหญ่) · ถ่ายรูปได้หลายรูป'});if(!h)return;
+  cur.lines.push({kind:'truck',pid:p.id,name:p.name,price:p.price,heavy:h.v,light:null,deduct:0,net:null,amount:null,ph:h.photos[0],phx:h.photos.slice(1),pl:null,plx:[]});
+  rLines();toast('เพิ่มรายการชั่งรถแล้ว — รอรถลงของ กด "⏸ พักบิล" แล้วเปิดต่อเพื่อชั่งรถเบา',7000)};
+
+ window.truckLight=async function(i){const l=cur.lines[i],g=await numDlg({title:'น้ำหนักรถเบา',sub:l.name+' · กรอกน้ำหนักหลังลงสินค้าเสร็จ (ดูจากกิโลใหญ่) · ถ่ายรูปได้หลายรูป',photos:[l.pl,...(l.plx||[])].filter(Boolean)});if(!g)return;
+  if(g.v>=l.heavy)return toast('น้ำหนักรถเบาต้องน้อยกว่ารถหนัก ('+f2(l.heavy)+')');
+  const d=await numDlg({title:'หักน้ำหนัก (ถ้ามี)',sub:'เช่น น้ำมัน พาเลท หรือกดข้ามหากไม่มี',skip:'ข้าม',cam:false});if(!d)return;const dv=d.skip?0:d.v,net=r2(l.heavy-g.v-dv);
+  if(net<=0)return toast('น้ำหนักสุทธิต้องมากกว่า 0');
+  l.pl=g.photos[0];l.plx=g.photos.slice(1);l.light=g.v;l.deduct=dv;l.net=net;l.amount=r2(net*l.price);rLines();
+  await dlg('✅ คำนวณน้ำหนักเรียบร้อย',{body:`<div style="text-align:left;margin:8px 0"><div class="row2"><span>น้ำหนักรถหนัก</span><b>${f2(l.heavy)} กก.</b></div><div class="row2"><span>น้ำหนักรถเบา</span><b>${f2(l.light)} กก.</b></div><div class="row2"><span>น้ำหนักหัก</span><b>${f2(l.deduct)} กก.</b></div><div class="row2" style="background:#fff3cd;color:#b45309;padding:8px;border-radius:8px;font-size:22px"><span>สุทธิ</span><b>${f2(l.net)} กก.</b></div><div class="row2"><span>เป็นเงิน</span><b>฿${f2(l.amount)}</b></div></div>`,ok:'ตกลง',no:'ปิด'})};
+
+ // ---------- จัดการรูปของรายการชั่งรถ (เพิ่ม/ลบ โดยไม่ต้องชั่งใหม่) ----------
+ async function managePhotos(l){const d=document.createElement('dialog');d.style.cssText='max-width:480px;width:94%;border-radius:14px;background:var(--c);color:var(--t)';
+  d.innerHTML=`<b style="font-size:18px">📷 จัดการรูป: ${esc(l.name)}</b><video autoplay playsinline muted style="margin-top:8px;max-height:150px"></video><div style="margin-top:8px"><b>🚚 รูปรถหนัก</b></div><div class="hb"></div><div style="margin-top:10px"><b>🚚 รูปรถเบา</b>${l.light==null?' <span class="m">(ยังไม่ได้ชั่งรถเบา)</span>':''}</div><div class="lb"></div><div class="row" style="margin-top:12px"><button class="c">ยกเลิก</button><button class="pri s">💾 บันทึก</button></div>`;
+  document.body.appendChild(d);d.showModal();const v=d.querySelector('video'),hl=[l.ph,...(l.phx||[])].filter(Boolean),ll=[l.pl,...(l.plx||[])].filter(Boolean);
+  photoBox(d.querySelector('.hb'),hl,()=>v,()=>l.heavy);photoBox(d.querySelector('.lb'),ll,()=>v,()=>l.light||0);
+  d.querySelector('.c').onclick=()=>d.remove();d.oncancel=()=>d.remove();
+  d.querySelector('.s').onclick=()=>{if(!hl.length)return toast('รูปรถหนักต้องมีอย่างน้อย 1 รูป');if(l.light!=null&&!ll.length)return toast('รูปรถเบาต้องมีอย่างน้อย 1 รูป');
+   l.ph=hl[0];l.phx=hl.slice(1);l.pl=ll[0]||null;l.plx=ll.slice(1);d.remove();rLines();toast('บันทึกรูปแล้ว')};
+  if(!stream)await startCam();if(stream){v.srcObject=stream;v.play().catch(()=>{})}}
+
+ window.editTruck=function(i){const l=cur.lines[i],d=document.createElement('dialog');d.style.cssText='max-width:420px;width:92%;border-radius:12px;background:var(--c);color:var(--t)';
+  d.innerHTML=`<b>✏️ แก้ไข: ${esc(l.name)} (ชั่งรถ)</b><div class="m" style="margin:4px 0 8px">รถหนัก ${f2(l.heavy)} · รถเบา ${l.light==null?'-':f2(l.light)} · หัก ${f2(l.deduct||0)}</div><div style="display:grid;gap:8px"><button class="a1">⚖ ชั่งรถหนักใหม่</button><button class="a2">⚖ ชั่งรถเบา / หักน้ำหนักใหม่</button><button class="a4">📷 จัดการรูป (เพิ่ม/ลบ)</button><button class="a3">🏷 เปลี่ยนสินค้า</button><button class="c">ปิด</button></div>`;
+  document.body.appendChild(d);d.showModal();const cl=()=>d.remove();d.querySelector('.c').onclick=cl;d.oncancel=cl;
+  d.querySelector('.a1').onclick=async()=>{cl();const h=await numDlg({title:'น้ำหนักรถหนัก (ชั่งใหม่)',sub:l.name,photos:[l.ph,...(l.phx||[])].filter(Boolean)});if(!h)return;l.heavy=h.v;l.ph=h.photos[0];l.phx=h.photos.slice(1);
+   if(l.light!=null){const net=r2(l.heavy-l.light-(l.deduct||0));if(net<=0){l.light=null;l.pl=null;l.plx=[];l.net=null;l.amount=null;l.deduct=0;toast('น้ำหนักรถเบาเดิมใช้ไม่ได้แล้ว กรุณาชั่งรถเบาใหม่',6000)}else{l.net=net;l.amount=r2(net*l.price)}}rLines()};
+  d.querySelector('.a2').onclick=()=>{cl();truckLight(i)};
+  d.querySelector('.a4').onclick=()=>{cl();managePhotos(l)};
+  d.querySelector('.a3').onclick=async()=>{cl();const p=await pickProd();if(!p||p.price<=0)return;l.pid=p.id;l.name=p.name;l.price=p.price;if(l.net!=null)l.amount=r2(l.net*l.price);rLines()}};
+
+ // ---------- แสดงรูปทั้งหมดของรายการรถในบิล (กดดูใหญ่ เลื่อนซ้าย-ขวาได้) ----------
+ const lh0=window.lineHtml;
+ window.lineHtml=function(l,i){const h=lh0.apply(this,arguments);if(!l||l.kind!='truck')return h;
+  const ex=[l.pl,...(l.phx||[]),...(l.plx||[])].filter(Boolean).map(x=>phUrl(x)).filter(Boolean);if(!ex.length)return h;
+  return h.replace('<button class="ic ed"',ex.map(u=>`<img class="th img-view-thumb" src="${u}" alt="รูปหลักฐานรถ" title="กดเพื่อดูรูปใหญ่" tabindex="0">`).join('')+'<button class="ic ed"')};
+
+ // ---------- บันทึกรูปเพิ่มลงบิล ----------
+ const extras=()=>cur.lines.filter(l=>l.kind=='truck').flatMap(l=>[...(l.phx||[]).map(x=>[x,l.name+' · รถหนัก']),...(l.plx||[]).map(x=>[x,l.name+' · รถเบา'])]);
+ async function saveExtras(billId,ex){for(const[x,name]of ex){try{const path=isData(x)?await upPhoto(x,billId+'/x'+uid()+'.jpg'):x;const{error}=await sb.from('bill_photos').insert({bill_id:billId,path,product_name:name});if(error)throw error}catch(e){toast('อัปโหลดรูปเพิ่มไม่สำเร็จ: '+(e.message||e),7000)}}}
+ // บิลใหม่: อัปโหลดทันทีที่สร้างบิลเสร็จ
+ const ib1=window.insBill;
+ window.insBill=async function(){const ex=extras(),b=await ib1.apply(this,arguments);if(ex.length)await saveExtras(b.id,ex);return b};
+ // บิลที่แก้ไข (แอดมิน/ผู้ชั่งที่ถูกตีคืน): เพิ่มรูปหลังบันทึกสำเร็จ
+ const sv1=window.saveBill;
+ window.saveBill=async function(){const eid=cur.editId,ex=eid?extras():[],r=await sv1.apply(this,arguments);if(eid&&ex.length&&!cur.editId)await saveExtras(eid,ex);return r};
+})();
+</script>
+ 
+
 <script>  
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
