@@ -144,7 +144,7 @@ function dlg(title,{input=false,ok='ตกลง',danger=false,no='ยกเล�
  document.body.appendChild(d);d.showModal();const done=v=>{d.remove();r(v)};d.oncancel=()=>done(null);d.querySelector('#dn').onclick=()=>done(null);
  d.querySelector('#dk').onclick=()=>{const v=input?d.querySelector('#di').value.trim():true;if(input&&!v)return d.querySelector('#di').focus();done(v)}})}
 const BUILD='2026-10-17 r20';console.log('Mingkwan build',BUILD);
-const sb=supabase.createClient('https://sunifccylaokivalwjic.supabase.co','sb_publishable_mNYJioB49fgTQZZzQq3zgg_QpA0fu2n',{global:{fetch:(u,o)=>fetch(u,{...o,cache:'no-store'})}});
+const sb=supabase.createClient('https://qgkjfwhvigdusullghkr.supabase.co','sb_publishable_ljAB0eQpao1eRybFGAcVbg_EvtICAg3',{global:{fetch:(u,o)=>fetch(u,{...o,cache:'no-store'})}});
 let ME=null,T=[],saving=false;const TABS={clerk:['weigh','truck','dash','mine'],cashier:['dash','admin','hist','stock','rep'],admin:['weigh','truck','dash','admin','hist','staff','audit','stock','rep','prod','set']},RL={clerk:'User — พนักงานชั่ง',cashier:'ผู้จ่ายเงิน/บัญชี',admin:'Admin'},can=t=>TABS[ME?.role]?.includes(t),FRONT=['weigh','truck','dash','mine'],TC={weigh:'#22c55e',truck:'#0ea5e9',dash:'#818cf8',mine:'#2dd4bf',admin:'#f59e0b',hist:'#a78bfa',audit:'#f472b6',stock:'#fb923c',rep:'#60a5fa',prod:'#a3e635',set:'#94a3b8',staff:'#e879f9'};
 let S={shop:'Mingkwan Smart Scale',recorder:'พนักงาน 1',pin:'1234',tares:'ตะกร้าเล็ก:1.2,ตะกร้าใหญ่:2.5,กระสอบ:0.3',unit:'kg'};
 let P=[],B=[],cur={lines:[],photos:[]},adm=false,cash=false,stream=null,liveW=0,lastPend=-1;
