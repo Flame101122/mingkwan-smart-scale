@@ -144,7 +144,7 @@ function dlg(title,{input=false,ok='ตกลง',danger=false,no='ยกเล�
  document.body.appendChild(d);d.showModal();const done=v=>{d.remove();r(v)};d.oncancel=()=>done(null);d.querySelector('#dn').onclick=()=>done(null);
  d.querySelector('#dk').onclick=()=>{const v=input?d.querySelector('#di').value.trim():true;if(input&&!v)return d.querySelector('#di').focus();done(v)}})}
 const BUILD='2026-10-17 r20';console.log('Mingkwan build',BUILD);
-const sb=supabase.createClient('https://sunifccylaokivalwjic.supabase.co','sb_publishable_mNYJioB49fgTQZZzQq3zgg_QpA0fu2n',{global:{fetch:(u,o)=>fetch(u,{...o,cache:'no-store'})}});
+const sb=supabase.createClient('https://qgkjfwhvigdusullghkr.supabase.co','sb_publishable_ljAB0eQpao1eRybFGAcVbg_EvtICAg3',{global:{fetch:(u,o)=>fetch(u,{...o,cache:'no-store'})}});
 let ME=null,T=[],saving=false;const TABS={clerk:['weigh','truck','dash','mine'],cashier:['dash','admin','hist','stock','rep'],admin:['weigh','truck','dash','admin','hist','staff','audit','stock','rep','prod','set']},RL={clerk:'User — พนักงานชั่ง',cashier:'ผู้จ่ายเงิน/บัญชี',admin:'Admin'},can=t=>TABS[ME?.role]?.includes(t),FRONT=['weigh','truck','dash','mine'],TC={weigh:'#22c55e',truck:'#0ea5e9',dash:'#818cf8',mine:'#2dd4bf',admin:'#f59e0b',hist:'#a78bfa',audit:'#f472b6',stock:'#fb923c',rep:'#60a5fa',prod:'#a3e635',set:'#94a3b8',staff:'#e879f9'};
 let S={shop:'Mingkwan Smart Scale',recorder:'พนักงาน 1',pin:'1234',tares:'ตะกร้าเล็ก:1.2,ตะกร้าใหญ่:2.5,กระสอบ:0.3',unit:'kg'};
 let P=[],B=[],cur={lines:[],photos:[]},adm=false,cash=false,stream=null,liveW=0,lastPend=-1;
@@ -1879,7 +1879,89 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
- <script>
+<script>
+// ===== r27 add-on: เมนู "💾 สำรองข้อมูล" (เฉพาะแอดมิน, เฉพาะข้อมูล ไม่มีรูป) =====
+(function(){
+ if(window.__mk27)return;window.__mk27=1;
+ const TB=['products','tare_presets','profiles','user_emails','customers','customer_plates','bills','bill_items','bill_photos','held_bills','truck_tickets','price_history'],
+  LK='mk_bk_last',BK={busy:false,stop:false},p2=n=>String(n).padStart(2,'0'),
+  stamp=()=>{const d=new Date();return d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+'_'+p2(d.getHours())+p2(d.getMinutes())},
+  say=t=>{const e=$('bkLog');if(e)e.textContent=t},bar=(v,m)=>{const e=$('bkBar');if(e){e.max=m||1;e.value=v}},
+  lastTxt=()=>{const v=localStorage.getItem(LK);return v?new Date(v).toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'}):'ยังไม่เคยสำรอง'};
+
+ // ---------- อ่านทุกตาราง (แบ่งหน้า 1,000 แถว) ----------
+ async function dump(){const out={};let i=0;
+  for(const t of TB){say('กำลังอ่านตาราง '+t+' ...');bar(i++,TB.length);const rows=[];
+   for(let o=0;;o+=1000){if(BK.stop)throw new Error('ยกเลิกแล้ว');
+    const{data,error}=await sb.from(t).select('*').order('id').range(o,o+999);if(error)throw new Error(t+': '+error.message);
+    rows.push(...data);if(data.length<1000)break}
+   out[t]=rows}
+  bar(TB.length,TB.length);
+  return{app:'Mingkwan Smart Scale',build:BUILD,exported_at:new Date().toISOString(),counts:Object.fromEntries(Object.entries(out).map(([k,v])=>[k,v.length])),tables:out}}
+ const saveBlob=(name,blob)=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)};
+ const cell=v=>{if(v==null)return '';if(typeof v=='object')v=JSON.stringify(v);return '"'+String(v).replace(/"/g,'""')+'"'},
+  toCsv=r=>{if(!r.length)return '';const k=Object.keys(r[0]);return '\ufeff'+[k.join(','),...r.map(x=>k.map(c=>cell(x[c])).join(','))].join('\r\n')};
+ const done=()=>{localStorage.setItem(LK,new Date().toISOString());const e=$('bkLast');if(e)e.textContent=lastTxt()};
+ const IDS=['bkJ','bkC','bkU'];
+ const lock=on=>{BK.busy=on;BK.stop=false;IDS.forEach(i=>{const b=$(i);if(b)b.disabled=on});const s=$('bkS');if(s)s.style.display=on?'':'none'};
+ const sum=d=>Object.entries(d.counts).map(([k,v])=>k+' '+v).join(' · ');
+
+ // ---------- 1) JSON ไฟล์เดียว ----------
+ async function bkJson(){if(BK.busy)return;lock(true);
+  try{const d=await dump();saveBlob('mingkwan_backup_'+stamp()+'.json',new Blob([JSON.stringify(d)],{type:'application/json'}));done();say('✅ ดาวน์โหลดแล้ว · '+sum(d))}
+  catch(e){say('❌ '+e.message)}finally{lock(false)}}
+
+ // ---------- 2) CSV แยกตาราง (zip) ----------
+ async function bkCsv(){if(BK.busy)return;lock(true);
+  try{if(!window.JSZip)await loadJs('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+   const d=await dump(),z=new JSZip();for(const t of TB)z.file(t+'.csv',toCsv(d.tables[t]));
+   say('กำลังบีบอัดไฟล์ ...');saveBlob('mingkwan_csv_'+stamp()+'.zip',await z.generateAsync({type:'blob'}));done();say('✅ ดาวน์โหลดแล้ว · '+sum(d))}
+  catch(e){say('❌ '+e.message)}finally{lock(false)}}
+
+ // ---------- 3) ประวัติลูกค้า (ลูกค้า 1 คน = 1 แถว) ----------
+ async function bkCust(){if(BK.busy)return;lock(true);
+  try{const C=[],S={};
+   say('กำลังอ่านรายชื่อลูกค้า ...');
+   for(let o=0;;o+=1000){const{data,error}=await sb.from('customers').select('id,name,created_at,customer_plates(plate,last_used_at)').order('name').range(o,o+999);if(error)throw new Error(error.message);C.push(...data);if(data.length<1000)break}
+   say('กำลังรวมยอดซื้อจากบิล ...');
+   for(let o=0;;o+=1000){const{data,error}=await sb.from('bills').select('seller_name,total,status,created_at').in('status',['pending','approved']).order('created_at').range(o,o+999);if(error)throw new Error(error.message);
+    data.forEach(b=>{const k=String(b.seller_name||'').trim().toLowerCase(),s=S[k]=S[k]||{n:0,t:0,l:''};s.n++;s.t+=+b.total||0;if(b.created_at>s.l)s.l=b.created_at});if(data.length<1000)break}
+   const fd=d=>d?new Date(d).toLocaleDateString('th-TH'):'',
+    R=C.map(c=>{const s=S[String(c.name).trim().toLowerCase()]||{n:0,t:0,l:''},pl=[...(c.customer_plates||[])].sort((a,b)=>String(b.last_used_at).localeCompare(String(a.last_used_at)));
+     return{'ชื่อลูกค้า':c.name,'ทะเบียนรถ':pl.map(p=>p.plate).join(' | '),'จำนวนทะเบียน':pl.length,'จำนวนบิล':s.n,'ยอดซื้อรวม (บาท)':Math.round(s.t*100)/100,'ซื้อล่าสุด':fd(s.l),'เพิ่มเข้าระบบ':fd(c.created_at)}});
+   saveBlob('customers_'+stamp()+'.csv',new Blob([toCsv(R)],{type:'text/csv'}));done();say('✅ ดาวน์โหลดแล้ว · ลูกค้า '+R.length+' ราย')}
+  catch(e){say('❌ '+e.message)}finally{lock(false)}}
+
+ // ---------- หน้าเมนู ----------
+ window.rBackup=function(){const el=$('backup');if(!el)return;
+  el.innerHTML=`<div class="card"><b style="font-size:18px">💾 สำรองข้อมูล</b>
+  <div class="m" style="margin-top:4px">สำรองล่าสุด: <b id="bkLast">${lastTxt()}</b> · ควรสำรองอย่างน้อยสัปดาห์ละครั้ง และเก็บไว้คนละเครื่องกับระบบ</div>
+  <div class="m">สำรองเฉพาะข้อมูล ไม่รวมรูปภาพ · ใช้ได้ทุกเครื่องรวมมือถือ</div></div>
+  <div class="card"><b>👤 ประวัติลูกค้า</b>
+  <div class="m">ลูกค้า 1 คน = 1 แถว พร้อมทะเบียนทั้งหมด จำนวนบิล ยอดซื้อรวม และวันที่ซื้อล่าสุด เปิดใน Excel ได้</div>
+  <button id="bkU" style="margin-top:8px;background:#f97316;color:#fff;border-color:#f97316">👤 ดาวน์โหลดประวัติลูกค้า (CSV)</button></div>
+  <div class="card"><b>⬇ ข้อมูลทั้งระบบ</b>
+  <div class="m">JSON = ไฟล์เดียวครบทุกตาราง (ใช้นำเข้าระบบใหม่) · CSV = zip แยกตาราง เปิดใน Excel ได้</div>
+  <div class="row" style="margin-top:8px"><button class="bt-blue" id="bkJ">⬇ JSON</button><button id="bkC">⬇ CSV (zip)</button></div></div>
+  <div class="card"><progress id="bkBar" value="0" max="1" style="width:100%"></progress><div id="bkLog" class="m" style="margin-top:6px">พร้อมสำรอง</div><button class="dan" id="bkS" style="display:none;margin-top:6px">⏹ หยุด</button></div>
+  <div class="card m">ไม่รวม: รูปภาพ · รหัสผ่านผู้ใช้ · PIN แอดมิน · ยอดซื้อในไฟล์ประวัติลูกค้าจับคู่ด้วย "ชื่อผู้ขาย" ในบิล (ชื่อสะกดต่างกันจะนับแยก, ไม่รวมบิลยกเลิก/ปฏิเสธ)</div>`;
+  $('bkJ').onclick=bkJson;$('bkC').onclick=bkCsv;$('bkU').onclick=bkCust;$('bkS').onclick=()=>{BK.stop=true;say('กำลังหยุด ...')}};
+
+ // ---------- ลงทะเบียนเมนู (เฉพาะแอดมิน) ----------
+ const nav=$('nav'),main=document.querySelector('main');
+ if(nav&&main&&!document.querySelector('nav [data-t="backup"]')){
+  nav.insertAdjacentHTML('beforeend','<button data-t="backup">💾 สำรองข้อมูล</button>');main.insertAdjacentHTML('beforeend','<section id="backup"></section>');
+  if(!TABS.admin.includes('backup'))TABS.admin.push('backup');TC.backup='#10b981';
+  if(typeof ME!=='undefined'&&ME)document.querySelectorAll('nav button').forEach(b=>{if(!can(b.dataset.t))b.style.display='none'});
+  nav.addEventListener('click',e=>{if(e.target.closest('button')?.dataset.t=='backup'&&can('backup'))rBackup()})}
+ // เตือนถ้าไม่ได้สำรองเกิน 7 วัน (แอดมิน, ครั้งเดียวต่อการเปิดแอป)
+ const w=setInterval(()=>{if(!ME)return;clearInterval(w);if(ME.role!='admin')return;
+  const v=localStorage.getItem(LK);if(!v||Date.now()-Date.parse(v)>7*864e5)setTimeout(()=>toast('💾 ยังไม่ได้สำรองข้อมูลเกิน 7 วัน — ไปที่เมนู "สำรองข้อมูล"',10000),4000)},1000);
+ const css=document.createElement('style');css.textContent='nav button[data-t=backup]{--c1:#10b981}#bkBar{height:14px}';document.head.appendChild(css);
+})();
+</script>
+
+<script>
 // ===== r28 add-on: บิลใหม่ขึ้นหน้าแอดมินทันที (realtime มั่นคง + polling สำรองเร็ว + เชื่อมต่อใหม่อัตโนมัติ) =====
 (function(){
  if(window.__mk28)return;window.__mk28=1;
@@ -1933,7 +2015,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
- <script>
+<script>
 // ===== r29 add-on: ชั่งรถ (รถหนัก/รถเบา) ถ่ายรูปเพิ่มได้หลายรูป + ลบรูปได้ เหมือนหน้าชั่งปกติ =====
 (function(){
  if(window.__mk29)return;window.__mk29=1;
@@ -2015,7 +2097,6 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
  window.saveBill=async function(){const eid=cur.editId,ex=eid?extras():[],r=await sv1.apply(this,arguments);if(eid&&ex.length&&!cur.editId)await saveExtras(eid,ex);return r};
 })();
 </script>
- 
 
 <script>  
 if ('serviceWorker' in navigator) {
