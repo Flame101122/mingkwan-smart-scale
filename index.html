@@ -1962,56 +1962,72 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 </script>
 
 <script>
-// ===== r28 add-on: บิลใหม่ขึ้นหน้าแอดมินทันที (realtime มั่นคง + polling สำรองเร็ว + เชื่อมต่อใหม่อัตโนมัติ) =====
+// ===== r28 (แก้ด่วน): ลดโหลดฐานข้อมูล — เอาไปแทนบล็อก r28 เดิมทั้งก้อน =====
+// ของเดิม: poll ทุก 5 วินาที โหลด 300 บิล+รายการสินค้า, และฟัง bill_items ทุกแถว -> ทุกเครื่องยิงฐานรัว ๆ จน Data API 5xx
+// ของใหม่:
+//  1) โหลดบิลซ้อนกันหลายครั้ง -> รวมเหลือไม่เกิน 2 ครั้ง (ครั้งที่กำลังโหลด + 1 ครั้งหลังจบ)
+//  2) เช็กบิลใหม่ด้วยคำสั่งเล็ก ๆ (40 บิลล่าสุด 3 คอลัมน์) ทุก 15 วินาที เจอการเปลี่ยนแปลงถึงโหลดเต็ม
+//  3) ฟัง realtime เฉพาะตาราง bills (ตัด bill_items) + ต่อใหม่เองเมื่อหลุด
+//  4) ถ้าฐานตอบ error จะเว้นช่วงห่างขึ้นเอง (สูงสุด 60 วินาที) ไม่ซ้ำเติมตอนฐานมีปัญหา
 (function(){
- if(window.__mk28)return;window.__mk28=1;
- let ch=null,retry=0,rt=null,busy=false,lastSig='';
+ if(window.__mk28b)return;window.__mk28b=1;
 
- const sig=()=>B.map(b=>b.id+':'+b.status+':'+b.total).join('|');
+ // ---- 1) รวมการเรียก loadB ซ้อนกัน (ต่อจากตัวห่อของ r26 ถ้ามี) ----
+ const lb0=window.loadB;let run=null,q=null;
+ window.loadB=function(){
+  const self=this,a=arguments;
+  if(!run){run=Promise.resolve(lb0.apply(self,a)).finally(()=>{run=null});return run}
+  if(!q)q=run.then(()=>{q=null;return window.loadB()},()=>{q=null;return window.loadB()});
+  return q};
 
- // โหลดบิลแล้ววาดหน้าที่เปิดอยู่ใหม่ ถ้ามีอะไรเปลี่ยน
- async function refresh(force){
-  if(!ME||busy)return;busy=true;
+ // ---- วาดหน้าที่เปิดอยู่ใหม่ (หน้าแดชบอร์ดวาดไม่ถี่กว่า 60 วินาที เพราะหนัก) ----
+ let lastDash=0;
+ function repaint(){
   try{
-   await loadB();
-   const s=sig();
-   if(force||s!==lastSig){
-    lastSig=s;
-    if(cash&&$('admin').classList.contains('on'))rAdmin(true);
-    if($('mine').classList.contains('on'))rMine();
-    if($('dash').classList.contains('on'))rDash();
-   }
-  }catch(e){console.warn('[r28] refresh',e)}
-  finally{busy=false}
- }
+   if(cash&&$('admin').classList.contains('on'))rAdmin(true);
+   if($('mine').classList.contains('on'))rMine();
+   if($('dash').classList.contains('on')&&Date.now()-lastDash>60000){lastDash=Date.now();rDash()}
+  }catch(e){console.warn('[r28] repaint',e)}}
 
- // ---------- realtime ช่องใหม่ + ต่อใหม่เมื่อหลุด ----------
+ // ---- 2) เช็กแบบเบา: เทียบ 40 บิลล่าสุด (id:status:total) ----
+ let last='',delay=15000,timer=null,busy=false;
+ async function check(){
+  const{data,error}=await sb.from('bills').select('id,status,total').order('created_at',{ascending:false}).limit(40);
+  if(error)throw error;
+  const s=data.map(b=>b.id+':'+b.status+':'+b.total).join('|');
+  if(s===last)return;
+  const first=last==='',newTop=!first&&(data[0]&&!last.startsWith(data[0].id+':'));
+  last=s;
+  if(first)return;                       // ครั้งแรก: แอปโหลดไว้แล้ว แค่จำสถานะ
+  await window.loadB();repaint();
+  if(newTop)setTimeout(()=>{window.loadB().then(repaint)},3000);   // บิลใหม่: โหลดซ้ำอีกรอบ เผื่อรายการสินค้าเขียนตามมา
+ }
+ async function tick(){
+  timer=null;
+  if(ME&&!document.hidden&&!busy){
+   busy=true;
+   try{await check();delay=15000}
+   catch(e){delay=Math.min(delay*2,60000);console.warn('[r28] poll',e&&e.message||e)}
+   finally{busy=false}
+  }
+  timer=setTimeout(tick,delay)}
+
+ // ---- 3) realtime เฉพาะ bills + ต่อใหม่เมื่อหลุด ----
+ let ch=null,retry=0,rt=null,deb=null;
  function connect(){
-  if(!ME)return;
   clearTimeout(rt);
   try{if(ch)sb.removeChannel(ch)}catch(e){}
-  ch=sb.channel('bills-live2-'+Math.random().toString(36).slice(2,6))
-   .on('postgres_changes',{event:'*',schema:'public',table:'bills'},async pl=>{
-     // รอให้ bill_items เขียนเสร็จ แล้วโหลดซ้ำ 2 รอบกันตกหล่น
-     if(pl.eventType=='INSERT'){await new Promise(r=>setTimeout(r,1200));await refresh(true);setTimeout(()=>refresh(true),2500)}
-     else refresh(true)})
-   .on('postgres_changes',{event:'INSERT',schema:'public',table:'bill_items'},()=>{setTimeout(()=>refresh(true),600)})
+  ch=sb.channel('bills-live3-'+Math.random().toString(36).slice(2,6))
+   .on('postgres_changes',{event:'*',schema:'public',table:'bills'},()=>{
+     clearTimeout(deb);deb=setTimeout(()=>check().catch(()=>{}),1500)})
    .subscribe(st=>{
-     if(st=='SUBSCRIBED'){retry=0;console.log('[r28] realtime connected')}
+     if(st=='SUBSCRIBED')retry=0;
      else if(st=='CHANNEL_ERROR'||st=='TIMED_OUT'||st=='CLOSED'){
-       retry++;console.warn('[r28] realtime',st,'retry',retry);
-       clearTimeout(rt);rt=setTimeout(connect,Math.min(1000*retry,15000))}});
- }
- const w=setInterval(()=>{if(ME){clearInterval(w);connect();lastSig=sig()}},800);
+       retry++;clearTimeout(rt);rt=setTimeout(connect,Math.min(2000*retry,30000))}})}
 
- // ---------- polling สำรอง: ทุก 5 วินาที (เบา ดึงแค่ 300 บิลล่าสุด) ----------
- setInterval(()=>{if(!ME||document.hidden)return;refresh(false)},5000);
-
- // ---------- กลับมาเปิดหน้า / เน็ตกลับ / โฟกัสหน้าต่าง: ต่อ realtime ใหม่ + โหลดทันที ----------
- const wake=()=>{if(!ME)return;connect();refresh(true)};
- document.addEventListener('visibilitychange',()=>{if(!document.hidden)wake()});
- addEventListener('online',wake);
- addEventListener('focus',()=>{if(ME)refresh(false)});
+ const w=setInterval(()=>{if(ME){clearInterval(w);connect();timer=setTimeout(tick,3000)}},800);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ME)check().catch(()=>{})});
+ addEventListener('online',()=>{if(ME){connect();check().catch(()=>{})}});
 })();
 </script>
 
@@ -2098,6 +2114,8 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+
+
 <script>  
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -2107,4 +2125,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-</body></html>
+</body>
+</html>
