@@ -2114,6 +2114,92 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+ <script>
+// ===== r30 add-on: แดชบอร์ด (กราฟแนวโน้ม) + ปิดวัน/สรุปยอด อ่านฐาน "ครั้งเดียวตอน 17:00" =====
+// ก้อนเดียว วางท้ายสุดก่อน <script> ของ serviceWorker ไม่ต้องแก้โค้ดเดิม (ลบก้อนนี้ทิ้ง = กลับเป็นเหมือนเดิม)
+// หลักการ: ดักคำสั่งอ่านบิลของสองเมนูนี้ (เฉพาะ query ของ r13) ที่ชั้น fetch
+//   - อ่านจริงเฉพาะ: (ก) งานอัตโนมัติหลัง SNAP_H โมง วันละครั้ง (ข) ผู้ใช้กดปุ่ม/เลือกวันที่/ช่วงเวลา "ในหน้านั้น"
+//   - เวลาอื่น (เช่น เปิดเมนู) ใช้ข้อมูลที่เก็บไว้ ไม่ยิงฐาน
+//   - ถ้าไม่มีข้อมูลเก็บไว้ จะขึ้นข้อความแจ้ง ไม่อ่านฐาน
+// ถ้ากลไกนี้ทำงานผิดพลาด จะ "ปล่อยผ่านแบบเดิม" ไม่ทำให้แอปพัง
+(function(){
+ if(window.__mk30)return;window.__mk30=1;
+
+ const SNAP_H=17;                // <<< เวลาโหลดอัตโนมัติ (ชั่วโมง 0-23) เปลี่ยนได้ เช่น 18
+ const MAXC=40,CACHE=new Map(),F0=window.fetch.bind(window);
+ let allowUntil=0,jobUntil=0,stored=0,saveT=null,restored=false;
+ const dayKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),
+  sleep=ms=>new Promise(r=>setTimeout(r,ms)),hasMe=()=>typeof ME!=='undefined'&&!!ME;
+
+ // ---------- ตรวจว่าเป็น query ของสองเมนูนี้ (ไม่แตะ query อื่นของแอป) ----------
+ function gated(input,init){
+  try{
+   const method=((init&&init.method)||(input&&input.method)||'GET').toUpperCase();
+   if(method!=='GET')return null;
+   const url=typeof input==='string'?input:(input&&input.url)?input.url:String(input),
+    u=new URL(url,location.href);
+   if(!/\/rest\/v1\/bills$/.test(u.pathname)||!u.searchParams.has('offset'))return null;   // เฉพาะแบบแบ่งหน้า (.range) ของ r13
+   const sel=u.searchParams.get('select')||'';
+   const ok=sel==='id,created_at,total,status,bill_items(product_name,net_kg,amount)'      // กราฟแนวโน้ม
+        ||sel==='id,bill_no,total,created_at,seller_name'                                // บิลค้างจ่าย (หน้าปิดวัน)
+        ||sel.startsWith('*,bill_items(*)');                                             // บิลของวัน (หน้าปิดวัน)
+   return ok?url:null;
+  }catch(e){return null}}
+
+ // ---------- ดัก fetch ----------
+ window.fetch=async function(input,init){
+  const url=hasMe()?gated(input,init):null;
+  if(!url)return F0(input,init);
+  const key=ME.id+'|'+url,now=Date.now();
+  if(now<allowUntil||now<jobUntil){                              // อนุญาต: อ่านจริงแล้วเก็บไว้
+   const r=await F0(input,init);
+   if(r.ok){try{const body=await r.clone().text();CACHE.set(key,{body,at:Date.now()});
+     while(CACHE.size>MAXC)CACHE.delete(CACHE.keys().next().value);stored++;persistSoon()}catch(e){}}
+   return r}
+  const c=CACHE.get(key);                                        // ไม่อนุญาต: ใช้ข้อมูลที่เก็บไว้
+  if(c)return new Response(c.body,{status:200,headers:{'content-type':'application/json'}});
+  return new Response(JSON.stringify({message:'ประหยัดข้อมูล — หน้านี้โหลดอัตโนมัติ 1 ครั้งหลัง '+SNAP_H+':00 น. ถ้าต้องการดูทันที ให้กดปุ่มเลือกช่วงเวลา/"วันนี้" ในหน้านี้',code:'READ_GATED',details:null,hint:null}),
+   {status:503,headers:{'content-type':'application/json'}})};
+
+ // ---------- ผู้ใช้กด/เปลี่ยนค่า "ในหน้าแดชบอร์ดหรือปิดวัน" = สั่งโหลด (อนุญาต 3 วินาที) ----------
+ ['click','change','keydown'].forEach(ev=>document.addEventListener(ev,e=>{
+  const t=e.target;if(t&&t.closest&&t.closest('#dash,#close'))allowUntil=Date.now()+3000},true));
+
+ // ---------- เก็บข้อมูลของวันนี้ไว้ในเครื่อง (รีเฟรชหน้าแล้วยังอยู่) ----------
+ function persistSoon(){clearTimeout(saveT);saveT=setTimeout(()=>{try{idbSet('mk_gate',{day:dayKey(new Date()),items:[...CACHE]})}catch(e){}},1500)}
+ async function restore(){if(restored||!hasMe())return;restored=true;
+  try{const v=await idbGet('mk_gate');
+   if(v&&v.day===dayKey(new Date())&&Array.isArray(v.items))v.items.forEach(([k,x])=>{if(!CACHE.has(k))CACHE.set(k,x)})}catch(e){}}
+ const w=setInterval(()=>{if(hasMe()){clearInterval(w);restore()}},800);
+ const lo0=window.logout;
+ if(typeof lo0=='function')window.logout=async function(){try{CACHE.clear();await idbSet('mk_gate',null)}catch(e){}return lo0.apply(this,arguments)};
+
+ // ---------- งานอัตโนมัติ: หลัง SNAP_H โมง อ่านครั้งเดียวต่อวันต่อเครื่อง ----------
+ // เฉพาะ ผู้จ่ายเงิน/แอดมิน ที่เปิดแอปค้างไว้และหน้าจอเปิดอยู่ (พนักงานชั่งไม่ทำอัตโนมัติ)
+ let jobBusy=false,jobNext=0;
+ async function job(){
+  if(jobBusy||!hasMe()||ME.role==='clerk'||document.hidden)return;
+  const n=new Date(),day=dayKey(n),flag='mk_snap17_'+ME.id;
+  if(n.getHours()<SNAP_H||Date.now()<jobNext)return;
+  try{if(localStorage.getItem(flag)===day)return}catch(e){}
+  jobBusy=true;const s0=stored;
+  try{
+   jobUntil=Date.now()+120000;
+   // 1) กราฟแนวโน้ม: ถ้าเคยเปิดแดชบอร์ด กดปุ่มช่วงที่เลือกอยู่ (ให้คำนวณช่วงวันที่ใหม่) ไม่งั้นเรนเดอร์ใหม่ตามเดิม
+   const chip=document.querySelector('#mkPre .chip.on[data-p]');
+   if(chip)chip.click();else if(typeof window.rDash==='function')window.rDash();
+   await sleep(7000);
+   // 2) สรุปยอดวันนี้: ถ้าเคยเปิดหน้าปิดวัน กด "วันนี้" ไม่งั้นเรนเดอร์ใหม่ตามเดิม
+   const td=document.querySelector('#close [data-a="today"]');
+   if(td)td.click();else if(typeof window.rClose==='function')window.rClose();
+   await sleep(9000);
+   if(stored>s0){try{localStorage.setItem(flag,day)}catch(e){}}else jobNext=Date.now()+300000;   // ไม่ได้ข้อมูลเลย ลองใหม่ใน 5 นาที
+  }catch(e){jobNext=Date.now()+300000;console.warn('[r30]',e&&e.message||e)}
+  finally{jobUntil=0;jobBusy=false}}
+ setInterval(job,30000);
+})();
+</script>
+
 
 
 <script>  
