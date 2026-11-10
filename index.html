@@ -2200,6 +2200,81 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+ <script>
+// ===== r31 add-on: ต่อตาชั่งผ่านบลูทูธ BLE (Web Bluetooth) — ไม่แก้โค้ดเดิม =====
+// ใช้ได้กับหัว RS232-บลูทูธแบบ BLE (UART เช่น FFE0/FFE1, Nordic UART, ISSC/Microchip) บน Chrome/Edge (Android, Windows, Mac)
+// ใช้ไม่ได้กับบลูทูธ Classic (SPP/HC-05) และ iPhone/iPad
+(function(){
+ if(window.__mk31)return;window.__mk31=1;
+ const SV=[0xffe0,0xfff0,0xffe5,0xffb0,0xff00,0xfee0,0xae00,0xabf0,0x18f0,
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e','49535343-fe7d-4ae5-8fa9-9fafd205e455',
+  '0000fff0-0000-1000-8000-00805f9b34fb','569a1101-b87f-490c-92cb-11ba5ea5167c'];
+ const SKIP=/^0000(1800|1801|180a|180f)-/;
+ const bleOn=()=>!!(scPort&&scPort.__ble);
+
+ function makePort(dev,nots,tx){
+  let ctrl=null,closed=false,gone=false;
+  const onVal=e=>{const v=e.target.value;if(!v||closed)return;
+   try{ctrl.enqueue(new Uint8Array(v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength)))}catch(_){}};
+  const end=()=>{if(closed)return;closed=true;try{ctrl&&ctrl.close()}catch(_){}ctrl=null};
+  const onDis=()=>end();
+  nots.forEach(c=>c.addEventListener('characteristicvaluechanged',onVal));
+  dev.addEventListener('gattserverdisconnected',onDis);
+  const port={__ble:true,name:dev.name||'BLE',
+   readable:new ReadableStream({start(c){ctrl=c},cancel(){closed=true;ctrl=null}}),
+   writable:new WritableStream({async write(ch){
+    if(!tx)return;const b=ch instanceof Uint8Array?ch:new Uint8Array(ch);
+    for(let i=0;i<b.length;i+=20){const s=b.slice(i,i+20);
+     try{tx.writeValueWithoutResponse?await tx.writeValueWithoutResponse(s):await tx.writeValue(s)}catch(e){await tx.writeValue(s)}}}}),
+   async open(){},async setSignals(){},getInfo(){return{}},
+   async close(){if(gone)return;gone=true;end();
+    nots.forEach(c=>{try{c.removeEventListener('characteristicvaluechanged',onVal);c.stopNotifications().catch(()=>{})}catch(_){}});
+    dev.removeEventListener('gattserverdisconnected',onDis);
+    try{dev.gatt.connected&&dev.gatt.disconnect()}catch(_){}}};
+  return port}
+
+ async function scBle(){
+  if(scOn)return scClose();
+  if(!navigator.bluetooth)return toast('เบราว์เซอร์นี้ไม่รองรับบลูทูธ (ใช้ Chrome/Edge และต้องเปิดผ่าน https)',7000);
+  let dev;
+  try{dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:SV})}
+  catch(e){if(e.name!=='NotFoundError')toast('เลือกอุปกรณ์ไม่สำเร็จ: '+e.message,7000);return}
+  toast('กำลังเชื่อมต่อ '+(dev.name||'อุปกรณ์')+' ...',4000);
+  let port=null;
+  try{
+   const srv=await dev.gatt.connect(),svcs=(await srv.getPrimaryServices()).filter(s=>!SKIP.test(s.uuid));
+   let nots=[],tx=null;
+   for(const s of svcs){
+    const cs=await s.getCharacteristics(),n=cs.filter(c=>c.properties.notify||c.properties.indicate);
+    if(!n.length)continue;
+    nots=n;tx=cs.find(c=>c.properties.writeWithoutResponse||c.properties.write)||null;break}
+   if(!nots.length)throw new Error('ไม่พบช่องรับข้อมูล (notify) — บริการที่พบ: '+(svcs.map(s=>s.uuid.slice(0,8)).join(', ')||'ไม่มี'));
+   for(const c of nots)await c.startNotifications();
+   port=makePort(dev,nots,tx);
+   scTried=true; // กันระบบหา baud อัตโนมัติ (ไม่เกี่ยวกับบลูทูธ)
+   await scOpen(port);
+   toast('✅ เชื่อมต่อบลูทูธ '+(dev.name||'')+' แล้ว',5000);
+  }catch(e){
+   try{port?await port.close():dev.gatt.connected&&dev.gatt.disconnect()}catch(_){}
+   toast('ต่อบลูทูธไม่ได้: '+(e.message||e)+' (ถ้าแอปทดสอบยังเชื่อมหัวอยู่ ให้ปิด/ตัดการเชื่อมต่อในแอปนั้นก่อน)',12000)}}
+ window.scBle=scBle;
+
+ // ---------- ปุ่ม (โลโก้บลูทูธ + ข้อความ Connect BT) ----------
+ const BTI='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><polyline points="6.5 7.5 17.5 16.5 12 21 12 3 17.5 7.5 6.5 16.5"/></svg>';
+ const b0=document.getElementById('scbtn');
+ if(b0&&!document.getElementById('scbt')){
+  b0.insertAdjacentHTML('afterend','<button id="scbt" onclick="scBle()" style="background:#0082fc;color:#fff;border-color:#0082fc">'+BTI+'Connect BT</button>');
+  setInterval(()=>{const b=document.getElementById('scbt');if(!b)return;
+   const t=bleOn()?'Disconnect BT':'Connect BT';
+   if(b.dataset.t!==t){b.dataset.t=t;b.innerHTML=BTI+t}
+   b.disabled=scOn&&!bleOn()},1000)}
+
+ // ---------- แสดงข้อมูลพอร์ตใน ⚙ ให้ถูกต้อง ----------
+ const si0=window.scInfo;
+ window.scInfo=function(){return bleOn()?'พอร์ต: บลูทูธ BLE ('+esc(scPort.name)+')':si0.apply(this,arguments)};
+})();
+</script>
+
 
 
 <script>  
