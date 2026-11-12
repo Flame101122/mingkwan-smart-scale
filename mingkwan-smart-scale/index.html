@@ -2274,6 +2274,164 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
  window.scInfo=function(){return bleOn()?'พอร์ต: บลูทูธ BLE ('+esc(scPort.name)+')':si0.apply(this,arguments)};
 })();
 </script>
+
+ <script>
+// ===== r33 add-on: กันฐานค้าง + หลอดการใช้งานฐานข้อมูล =====
+// วางต่อท้ายสคริปต์สุดท้าย (ต่อจาก r32) และก่อน <script> ของ serviceWorker | ไม่แก้โค้ดเดิม (ลบก้อนนี้ = กลับเป็นเหมือนเดิม)
+// ทำอะไร:
+//  1) จำกัดจำนวนคำขอพร้อมกัน (คิว) ไม่ให้ยิงฐานรัว
+//  2) ฐานตอบช้า/ผิดพลาด -> ใช้ข้อมูลล่าสุดที่เก็บไว้แสดงแทน (หน้าจอไม่ว่าง) และพักการโหลดเบื้องหลังชั่วคราว
+//  3) ตัดการวนส่งรูปพักบิลซ้ำ ๆ เมื่ออัปโหลดไม่ผ่าน (circuit breaker) และ "ห้ามเก็บรูป base64 ลงฐาน"
+//  4) ฐานช้า/ใช้งานหนัก -> กด "พักบิล" จะเก็บลงเครื่องให้อัตโนมัติ (ใช้ระบบ 📥 เก็บบิล เดิม) ผู้ใช้ทำงานต่อได้
+//  5) ยืดรอบโหลดอัตโนมัติเดิม (ทุก 30 วิ ทุกเครื่อง) เป็น 60 วิ + ลดจำนวนบิลที่โหลดต่อครั้ง
+//  6) หลอดแสดง % การใช้งานฐาน + แจ้งเตือน "ระวังการส่งข้อมูลเกิน"
+(function(){
+ if(window.__mk33)return;window.__mk33=1;
+
+ // ---------- ค่าปรับได้ ----------
+ const LIM={
+  req:90,        // จำนวนคำขอ/นาที/เครื่อง ที่ถือว่า 100%
+  upMB:6,        // ข้อมูลส่งขึ้น (MB/นาที/เครื่อง) ที่ถือว่า 100%
+  err:4,         // ข้อผิดพลาด/นาที ที่ถือว่า 100%
+  holds:12,      // บิลที่พักค้างเกินนี้ -> เตือน
+  holdMax:25,    // บิลที่พักค้างเกินนี้ -> ถามยืนยันก่อนพักเพิ่ม (นับเป็น 100%)
+  conc:4,        // คำขอพร้อมกันสูงสุด
+  tmo:20000,     // รอผลโหลดข้อมูลสูงสุดกี่ ms ก่อนใช้ข้อมูลที่เก็บไว้
+  pollMs:60000,  // รอบโหลดอัตโนมัติเดิม (เดิม 30000)
+  billLimit:150  // จำนวนบิลล่าสุดที่โหลด (เดิม 300)
+ };
+ const now=()=>Date.now(),hasMe=()=>typeof ME!=='undefined'&&!!ME;
+ const ST={win:[],up:[],err:[],degraded:0,stale:0,lastUser:0,hold:{fail:0,until:0},warn:0};
+ const trim=(a,ms)=>{const t=now()-ms;while(a.length&&a[0][0]<t)a.shift()};
+ const HOST=(()=>{try{return new URL(sb.supabaseUrl).host}catch(e){return 'qgkjfwhvigdusullghkr.supabase.co'}})();
+ ['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{ST.lastUser=now()},true));
+
+ // ---------- ยืดรอบโหลดอัตโนมัติเดิมใน boot() (ตัวที่โหลด 300 บิล + พักบิล ทุก 30 วิ) ----------
+ const si0=window.setInterval;
+ window.setInterval=function(fn,ms){
+  try{if(typeof fn==='function'&&ms===30000){const s=Function.prototype.toString.call(fn);if(/loadHolds\(\)/.test(s)&&/loadB\(\)/.test(s)){arguments[1]=LIM.pollMs}}}catch(e){}
+  return si0.apply(this,arguments)};
+
+ // ---------- คิวจำกัดคำขอพร้อมกัน ----------
+ let active=0;const wq=[];
+ const acquire=()=>new Promise(r=>{if(active<LIM.conc){active++;r()}else wq.push(r)});
+ const release=()=>{const n=wq.shift();if(n)n();else active--};
+
+ // ---------- แคชคำตอบล่าสุด (ใช้ตอนฐานล่ม) ----------
+ const CACHE=new Map(),CT=/\/rest\/v1\/(bills|held_bills|products|tare_presets|profiles|customers|stock_docs|stock_moves|stock_summary|bill_photos|user_emails)(\?|$)/;
+ const ckey=u=>(hasMe()?ME.id:'')+'|'+u;
+ function bodySize(b){try{if(!b)return 0;if(typeof b==='string')return b.length;if(b instanceof Blob)return b.size;
+  if(b instanceof FormData){let s=0;b.forEach(v=>{if(v instanceof Blob)s+=v.size;else s+=String(v).length});return s}
+  if(b.byteLength!=null)return b.byteLength}catch(e){}return 0}
+ function markFail(){ST.err.push([now()]);trim(ST.err,60000);
+  const recent=ST.err.filter(x=>x[0]>now()-30000).length;if(recent>=3)ST.degraded=now()+45000;paint()}
+ const synth=(status,msg)=>new Response(JSON.stringify({message:msg,code:'MK_BLOCKED'}),{status,headers:{'content-type':'application/json'}});
+
+ const F1=window.fetch.bind(window);
+ window.fetch=async function(input,init){
+  let url,method='GET',u;
+  try{url=typeof input==='string'?input:(input&&input.url)||String(input);
+   method=((init&&init.method)||(input&&input.method)||'GET').toUpperCase();u=new URL(url,location.href)}catch(e){return F1(input,init)}
+  if(u.host!==HOST||!/^\/(rest|storage)\/v1\//.test(u.pathname))return F1(input,init);
+  const isRest=u.pathname.startsWith('/rest/v1/'),isGet=method==='GET',
+   isHoldUp=u.pathname.startsWith('/storage/v1/object/')&&/\/hold\//.test(u.pathname)&&method!=='GET';
+
+  // (ก) breaker รูปพักบิล: ส่งไม่ผ่านติดกัน -> หยุดยิงชั่วคราว (ไม่วนซ้ำทุก 30 วิ)
+  if(isHoldUp&&ST.hold.until>now())return synth(503,'หยุดส่งรูปพักบิลชั่วคราว (ส่งไม่ผ่านหลายครั้ง) — บิลยังอยู่ในเครื่อง');
+
+  // (ข) ลดจำนวนบิลที่โหลด
+  if(isRest&&isGet&&/\/bills$/.test(u.pathname)&&(u.searchParams.get('select')||'').startsWith('*,bill_items(*)')&&u.searchParams.get('limit')==='300'){
+   u.searchParams.set('limit',String(LIM.billLimit));if(typeof input==='string')input=u.toString()}
+
+  const key=ckey(u.toString()),cached=CACHE.get(key);
+  const stale=c=>{ST.stale=now();const h={'content-type':'application/json','x-mk-stale':'1'};if(c.h)h['content-range']=c.h;return new Response(c.b,{status:c.st||200,headers:h})};
+
+  // (ค) ฐานกำลังช้า: งานเบื้องหลัง (ผู้ใช้ไม่ได้กดเอง) ใช้ข้อมูลที่เก็บไว้ ไม่ซ้ำเติมฐาน
+  if(isRest&&isGet&&ST.degraded>now()&&now()-ST.lastUser>4000&&CT.test(u.pathname+(u.search?'?':'')))
+   return cached?stale(cached):synth(503,'ฐานข้อมูลกำลังช้า');
+
+  ST.win.push([now()]);const ub=bodySize(init&&init.body);if(ub>2048)ST.up.push([now(),ub]);
+
+  await acquire();
+  let tm=null,ctl=null;
+  try{
+   let opts=init;
+   if(isRest&&isGet&&!(init&&init.signal)&&!(input&&input.signal)){ctl=new AbortController();tm=setTimeout(()=>ctl.abort(),LIM.tmo);opts={...(init||{}),signal:ctl.signal}}
+   const res=await F1(input,opts);
+   if(tm){clearTimeout(tm);tm=null}
+   if(res.status>=500||res.status===408){
+    let gated=false;try{gated=(await res.clone().text()).includes('READ_GATED')}catch(e){}
+    if(!gated){markFail();if(isGet&&cached)return stale(cached)}
+    return res}
+   if(isHoldUp){if(res.status>=400){ST.hold.fail++;if(ST.hold.fail>=2)ST.hold.until=now()+Math.min(60000*Math.pow(2,ST.hold.fail-2),600000);
+     console.warn('[r33] อัปโหลดรูปพักบิลไม่ผ่าน',res.status,'(ต้อง Run fix_db_load.sql?)')}else{ST.hold.fail=0;ST.hold.until=0}}
+   if(isRest&&isGet&&res.status===200&&CT.test(u.pathname+(u.search?'?':''))){
+    const ch=res.headers.get('content-range'),cl=res.clone();
+    cl.text().then(b=>{if(b.length<1500000){CACHE.set(key,{b,at:now(),h:ch,st:200});while(CACHE.size>40)CACHE.delete(CACHE.keys().next().value)}}).catch(()=>{})}
+   return res;
+  }catch(e){
+   if(tm)clearTimeout(tm);
+   if(isRest){markFail();if(isGet&&cached)return stale(cached)}
+   throw e
+  }finally{release()}
+ };
+
+ // ---------- ห้ามเก็บรูป base64 ลงฐาน (ของเดิม r18 คืน base64 ถ้าอัปโหลด hold/ ไม่ผ่าน) ----------
+ const up0=window.upPhoto;
+ if(typeof up0==='function')window.upPhoto=async function(d,path){
+  const r=await up0.apply(this,arguments);
+  if(String(path).startsWith('hold/')&&String(r).startsWith('data:'))
+   throw new Error('อัปโหลดรูปพักบิลไม่ผ่าน (สิทธิ์ Storage — ให้แอดมิน Run fix_db_load.sql) · ไม่เก็บรูปลงฐานเพื่อกันฐานค้าง');
+  return r};
+
+ // ---------- พักบิล: ฐานช้า/ใช้งานหนัก -> เก็บลงเครื่องก่อน ผู้ใช้ทำงานต่อได้ ----------
+ function usage(){trim(ST.win,60000);trim(ST.up,60000);trim(ST.err,60000);
+  const req=ST.win.length,mb=ST.up.reduce((a,x)=>a+x[1],0)/1048576,er=ST.err.length,h=(typeof HOLDS!=='undefined'&&HOLDS)?HOLDS.length:0,
+   parts={req:req/LIM.req,up:mb/LIM.upMB,err:er/LIM.err,hold:h/LIM.holdMax};
+  let k='req',m=0;for(const x in parts)if(parts[x]>m){m=parts[x];k=x}
+  if(ST.degraded>now()&&m<1){m=1;k='err'}
+  return{req,mb,er,h,m,k}}
+ const hb0=window.holdBill;
+ if(typeof hb0==='function')window.holdBill=async function(){
+  if(hasMe()&&cur&&!cur.editId&&cur.lines.length){
+   const u=usage();
+   if((ST.degraded>now()||ST.hold.until>now()||u.m>=0.9)&&typeof window.stashBill==='function'){
+    toast('⚠ ฐานข้อมูลกำลังใช้งานหนัก — เก็บบิลไว้ในเครื่องก่อน (ส่งขึ้นอัตโนมัติเมื่อฐานพร้อม ไม่หาย)',8000);
+    return window.stashBill()}
+   if(u.h>=LIM.holdMax&&!await dlg('มีบิลที่พักค้างอยู่ '+u.h+' ใบ — พักเพิ่มจะทำให้ระบบช้า ควรจ่าย/บันทึกบิลที่ค้างก่อน พักเพิ่มต่อไหม?',{ok:'พักต่อ',no:'ยกเลิก'}))return;
+   if(u.h>=LIM.holds&&u.h<LIM.holdMax)toast('⚠ มีบิลพักค้าง '+u.h+' ใบ — ควรเคลียร์ของที่เสร็จแล้ว',6000)}
+  return hb0.apply(this,arguments)};
+
+ // ---------- หลอดการใช้งาน ----------
+ const WHY={req:'จำนวนคำขอต่อนาทีสูง',up:'ส่งข้อมูล/รูปมาก',err:'ฐานตอบช้า/ผิดพลาด',hold:'บิลที่พักค้างเยอะ'};
+ const css=document.createElement('style');css.textContent=`
+ #mkMeter{position:fixed;left:12px;bottom:12px;z-index:46;display:flex;align-items:center;gap:8px;width:auto;min-height:0;padding:6px 12px;border-radius:99px;background:#0f1b2d;color:#fff;border:2px solid var(--mc,#16a34a);font-size:13px;box-shadow:0 2px 10px #0006}
+ #mkMeter .mkt{width:70px;height:8px;background:#ffffff33;border-radius:6px;overflow:hidden}#mkMeter .mkt i{display:block;height:100%;background:var(--mc,#16a34a);transition:width .4s}
+ #mkBan{position:fixed;top:0;left:0;right:0;z-index:70;background:#b91c1c;color:#fff;text-align:center;padding:6px 10px;font-size:14px;font-weight:600;display:none}
+ @media(min-width:900px){#mkMeter{left:226px}}`;document.head.appendChild(css);
+ function detail(){const u=usage(),p=Math.min(100,Math.round(u.m*100));
+  dlg('สถานะการใช้งานฐานข้อมูล (เครื่องนี้)',{ok:'ตกลง',no:'ปิด',body:`<div style="text-align:left;margin:8px 0">
+   <div class="row2"><span>ระดับรวม</span><b>${p}% ${p>=80?'⚠ สูง':p>=50?'ปานกลาง':'ปกติ'}</b></div>
+   <div class="row2"><span>คำขอ/นาที</span><b>${u.req} / ${LIM.req}</b></div>
+   <div class="row2"><span>ส่งข้อมูลขึ้น/นาที</span><b>${u.mb.toFixed(2)} / ${LIM.upMB} MB</b></div>
+   <div class="row2"><span>ข้อผิดพลาด/นาที</span><b>${u.er}</b></div>
+   <div class="row2"><span>บิลที่พักค้าง</span><b>${u.h} / ${LIM.holdMax}</b></div>
+   <div class="m" style="margin-top:6px">ตัวที่สูงสุดตอนนี้: <b>${WHY[u.k]}</b></div>
+   <div class="m" style="margin-top:6px">ถ้าสูง: เคลียร์/จ่ายบิลที่พักค้าง, ทยอยพักบิลไม่ต้องรัว, ไม่ต้องรีเฟรชซ้ำ ๆ, เปิดรายงานทีละหน้า · ถ้าฐานช้า ระบบจะเก็บบิลในเครื่องให้เองแล้วส่งขึ้นทีหลัง</div></div>`})}
+ function paint(){if(!hasMe())return;const u=usage(),p=Math.min(100,Math.round(u.m*100)),c=p>=80?'#dc2626':p>=50?'#f59e0b':'#16a34a';
+  let el=document.getElementById('mkMeter');
+  if(!el){el=document.createElement('button');el.id='mkMeter';el.type='button';el.onclick=detail;document.body.appendChild(el)}
+  el.style.setProperty('--mc',c);el.title='แตะเพื่อดูรายละเอียด';
+  el.innerHTML='<span class="mkt"><i style="width:'+p+'%"></i></span><b>'+(p>=80?'⚠ ':'')+'ฐานข้อมูล '+p+'%</b>';
+  let b=document.getElementById('mkBan');if(!b){b=document.createElement('div');b.id='mkBan';document.body.appendChild(b)}
+  if(ST.degraded>now()){b.style.display='block';b.textContent='⚠ ฐานข้อมูลตอบช้า — ใช้ข้อมูลล่าสุดที่เก็บไว้ · ชั่งและ "เก็บบิล" ต่อได้ ระบบจะส่งขึ้นเองเมื่อพร้อม'}
+  else if(now()-ST.stale<30000){b.style.display='block';b.textContent='ℹ กำลังแสดงข้อมูลล่าสุดที่เก็บไว้ (โหลดข้อมูลใหม่ไม่สำเร็จ)'}
+  else b.style.display='none';
+  if(p>=80&&now()-ST.warn>120000){ST.warn=now();toast('⚠ ระวังการส่งข้อมูลเกิน — ฐานข้อมูลใช้งานหนัก ('+p+'%: '+WHY[u.k]+') ชะลอการพักบิล/เปิดรายงานสักครู่',9000)}}
+ setInterval(paint,2000);addEventListener('online',paint);
+})();
+</script>
+
  
 
 
