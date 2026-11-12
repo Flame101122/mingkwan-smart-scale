@@ -2114,7 +2114,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
- <script>
+<script>
 // ===== r30 add-on: แดชบอร์ด (กราฟแนวโน้ม) + ปิดวัน/สรุปยอด อ่านฐาน "ครั้งเดียวตอน 17:00" =====
 // ก้อนเดียว วางท้ายสุดก่อน <script> ของ serviceWorker ไม่ต้องแก้โค้ดเดิม (ลบก้อนนี้ทิ้ง = กลับเป็นเหมือนเดิม)
 // หลักการ: ดักคำสั่งอ่านบิลของสองเมนูนี้ (เฉพาะ query ของ r13) ที่ชั้น fetch
@@ -2200,7 +2200,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
- <script>
+<script>
 // ===== r31 add-on: ต่อตาชั่งผ่านบลูทูธ BLE (Web Bluetooth) — ไม่แก้โค้ดเดิม =====
 // ใช้ได้กับหัว RS232-บลูทูธแบบ BLE (UART เช่น FFE0/FFE1, Nordic UART, ISSC/Microchip) บน Chrome/Edge (Android, Windows, Mac)
 // ใช้ไม่ได้กับบลูทูธ Classic (SPP/HC-05) และ iPhone/iPad
@@ -2275,7 +2275,8 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
- <script>
+
+<script>
 // ===== r32 add-on: เมนู "🏭 คลัง/แยกชิ้น" — สต็อกคงเหลือ + แยกชิ้น/แปรสภาพ + ขายออก + นับ/ปรับยอด + ประวัติ =====
 // ต้อง Run migrate14_stock.sql ใน Supabase ก่อน | วางต่อท้าย r30 และก่อน <script> ของ serviceWorker (ไม่แก้โค้ดเดิม)
 // หลักการ: คงเหลือ = รับซื้อ(บิลที่จ่ายแล้ว ตาม view stock_summary เดิม) + แยกได้ − ใช้แยก − ขายออก ± ปรับยอด
@@ -2547,8 +2548,280 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+<script>
+// ===== r32 add-on: เมนู "🏭 คลัง/แยกชิ้น" — สต็อกคงเหลือ + แยกชิ้น/แปรสภาพ + ขายออก + นับ/ปรับยอด + ประวัติ =====
+// ต้อง Run migrate14_stock.sql ใน Supabase ก่อน | วางต่อท้าย r30 และก่อน <script> ของ serviceWorker (ไม่แก้โค้ดเดิม)
+// หลักการ: คงเหลือ = รับซื้อ(บิลที่จ่ายแล้ว ตาม view stock_summary เดิม) + แยกได้ − ใช้แยก − ขายออก ± ปรับยอด
+//          ต้นทุน = ถัวเฉลี่ยเคลื่อนที่ (ยกต้นทุนของที่แยกไปให้ผลผลิต)
+(function(){
+ if(window.__mk32)return;window.__mk32=1;
 
- <script>
+ // ---------- helpers ----------
+ const TY={process:['🔧','แยกชิ้น/แปรสภาพ','#8b5cf6'],sale:['💰','ขายออก','#16a34a'],adjust:['⚖','ปรับยอด','#f59e0b']};
+ const REASONS=['ยอดยกมา (เริ่มใช้ระบบ)','นับสต็อกจริง','ของเสียหาย/สูญหาย','อื่นๆ'];
+ const Z=n=>String(n).padStart(2,'0'),YMD=d=>d.getFullYear()+'-'+Z(d.getMonth()+1)+'-'+Z(d.getDate()),
+  today=()=>YMD(new Date()),addD=(s,n)=>{const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return YMD(d)},
+  k3=n=>(+n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:3}),
+  r3=n=>Math.round((+n+Number.EPSILON)*1000)/1000,
+  num=v=>{const x=parseFloat(String(v==null?'':v).replace(/,/g,''));return isFinite(x)?x:0},
+  key=id=>String(id==null?'':id),
+  nz=v=>Math.abs(v)<0.0005?'<span class="m">-</span>':k3(v),
+  prod=id=>P.find(x=>key(x.id)==key(id)),
+  pname=id=>{const p=prod(id);return p?p.name:'สินค้า #'+key(id).slice(0,6)},
+  thD=s=>{try{return new Date(s+'T00:00:00').toLocaleDateString('th-TH',{dateStyle:'medium'})}catch(e){return s}};
+
+ const I={tab:'stock',recv:{},mv:[],ok:false,err:'',p:null,busy:false,q:'',hide0:true,
+  pr:{src:'',kg:'',labor:'',alloc:'value',date:today(),note:'',outs:[{pid:'',kg:''},{pid:'',kg:''}]},
+  sl:{date:today(),party:'',note:'',rows:[{pid:'',kg:'',price:''}]},
+  ad:{reason:REASONS[0],note:'',q:'',vals:{},costs:{}},
+  h:{type:'',from:addD(today(),-29),to:today(),docs:[],err:''}};
+ let S={};
+
+ // ---------- โหลดข้อมูล ----------
+ async function pullMoves(){const out=[];
+  for(let o=0;o<50000;o+=1000){
+   const{data,error}=await sb.from('stock_moves').select('product_id,kg,value,sale_amount,role,stock_docs!inner(status,doc_type)').eq('stock_docs.status','active').order('id').range(o,o+999);
+   if(error)throw error;out.push(...data);if(data.length<1000)break}
+  return out}
+ function load(){
+  if(I.p)return I.p;
+  I.p=(async()=>{try{
+    const[a,m]=await Promise.all([sb.from('stock_summary').select('*'),pullMoves()]);
+    if(a.error)throw a.error;
+    I.recv={};(a.data||[]).forEach(x=>{I.recv[key(x.product_id)]={kg:+x.net_kg||0,cost:+x.cost||0}});
+    I.mv=m;I.ok=true;I.err=''}
+   catch(e){I.ok=false;I.err=e.message||String(e)}})().finally(()=>{I.p=null});
+  return I.p}
+ async function loadHist(){const h=I.h;
+  let q=sb.from('stock_docs').select('*,stock_moves(product_id,kg,value,sale_amount,role)').gte('doc_date',h.from).lte('doc_date',h.to).order('doc_date',{ascending:false}).order('created_at',{ascending:false}).limit(300);
+  if(h.type)q=q.eq('doc_type',h.type);
+  const{data,error}=await q;h.err=error?error.message:'';h.docs=error?[]:(data||[])}
+
+ // ---------- คำนวณคงเหลือ / ต้นทุนถัวเฉลี่ย ----------
+ const blank=()=>({recv:0,rc:0,pin:0,pinV:0,pout:0,poutV:0,sale:0,saleV:0,saleAmt:0,adj:0,adjV:0,kg:0,val:0,avg:0});
+ function calc(){const T={};
+  P.forEach(p=>{T[key(p.id)]=blank()});
+  const ent=id=>T[id]||(T[id]=blank());
+  for(const id in I.recv){const r=I.recv[id],s=ent(id);s.recv=r.kg;s.rc=r.cost}
+  for(const m of I.mv){const s=ent(key(m.product_id)),d=m.stock_docs||{},kg=+m.kg,v=+m.value;
+   if(d.doc_type=='process'){if(kg>0){s.pin+=kg;s.pinV+=v}else{s.pout+=kg;s.poutV+=v}}
+   else if(d.doc_type=='sale'){s.sale+=kg;s.saleV+=v;s.saleAmt+=(+m.sale_amount||0)}
+   else{s.adj+=kg;s.adjV+=v}}
+  for(const id in T){const s=T[id],p=prod(id);
+   s.kg=r3(s.recv+s.pin+s.pout+s.sale+s.adj);
+   s.val=s.rc+s.pinV+s.poutV+s.saleV+s.adjV;
+   s.avg=(s.kg>0.0005&&s.val>0)?s.val/s.kg:((s.recv>0&&s.rc>0)?s.rc/s.recv:(p?p.price:0))}
+  return T}
+ const sOf=id=>S[key(id)]||blank();
+
+ const optsH=sel=>{const by={};P.forEach(p=>{(by[p.cat]=by[p.cat]||[]).push(p)});
+  return '<option value="">— เลือกสินค้า —</option>'+Object.keys(by).map(c=>`<optgroup label="${esc(c)}">`+by[c].map(p=>`<option value="${esc(p.id)}"${key(p.id)==key(sel)?' selected':''}>${esc(p.code)} · ${esc(p.name)} (เหลือ ${k3(sOf(p.id).kg)})</option>`).join('')+'</optgroup>').join('')};
+
+ // ---------- กรอบหน้า ----------
+ function tabs(){const T=[['stock','📊 คงเหลือ'],['process','🔧 แยกชิ้น/แปรสภาพ'],['sale','💰 ขายออก']];if(adm)T.push(['adjust','⚖ นับ/ปรับยอด']);T.push(['hist','📜 ประวัติ']);
+  return `<div class="card row" id="ivTabs" style="gap:6px">${T.map(([k,t])=>`<button class="chip${I.tab==k?' on':''}" data-iv="${k}">${t}</button>`).join('')}</div>`}
+ function bind(el){if(el.__iv)return;el.__iv=1;el.addEventListener('click',onClick);el.addEventListener('input',onIn);el.addEventListener('change',onIn)}
+ window.rInv=function(){const el=$('inv');if(!el)return;bind(el);
+  if(I.tab=='adjust'&&!adm)I.tab='stock';
+  el.innerHTML=tabs()+'<div id="ivb"><div class="m" style="padding:24px;text-align:center">⏳ กำลังโหลด...</div></div>';
+  const go=async()=>{await load();if(I.tab=='hist')await loadHist();if($('inv')&&$('inv').classList.contains('on'))paint()};go()};
+ function paint(){const b=$('ivb');if(!b)return;
+  if(!I.ok){const miss=/stock_moves|stock_docs|schema cache|does not exist|relation|stock_summary/i.test(I.err);
+   b.innerHTML=`<div class="card" style="border-left:6px solid #dc2626"><b>โหลดข้อมูลสต็อกไม่ได้</b><div class="m" style="margin-top:6px">${esc(I.err)}</div>${miss?'<div style="margin-top:8px">ยังไม่ได้สร้างตารางสต็อก — ให้ Run <b>migrate14_stock.sql</b> ใน Supabase (SQL Editor) แล้วกด "ลองใหม่"</div>':''}<button class="pri" style="margin-top:8px" data-retry="1">🔄 ลองใหม่</button></div>`;return}
+  S=calc();
+  ({stock:pStock,process:pProc,sale:pSale,adjust:pAdj,hist:pHist}[I.tab]||pStock)(b)}
+
+ // ---------- 1) คงเหลือ ----------
+ function pStock(b){const T=P.map(p=>sOf(p.id)),tk=T.reduce((a,s)=>a+Math.max(0,s.kg),0),tv=T.reduce((a,s)=>a+Math.max(0,s.val),0),neg=T.filter(s=>s.kg<-0.0005).length;
+  b.innerHTML=`<div class="stats"><div class="stat"><span class="m">น้ำหนักคงเหลือรวม (กก.)</span><b>${k3(tk)}</b></div><div class="stat"><span class="m">มูลค่าสต็อก (฿ ตามต้นทุน)</span><b style="color:#16a34a">${f2(tv)}</b></div><div class="stat"><span class="m">ชนิดที่มีของ</span><b>${T.filter(s=>s.kg>0.0005).length}</b></div>${neg?`<div class="stat"><span class="m">⚠ ติดลบ</span><b style="color:#dc2626">${neg}</b></div>`:''}</div>
+  <div class="card row" style="align-items:center"><input data-k="q" placeholder="🔍 ค้นหาชื่อ/รหัส/หมวด" value="${esc(I.q)}" style="flex:3;min-width:160px"><label style="display:flex;gap:6px;align-items:center;flex:0 0 auto"><input type="checkbox" data-k="hide0" style="width:auto"${I.hide0?' checked':''}> ซ่อนสินค้าที่ไม่เคยเคลื่อนไหว</label><button data-csv="1">⬇ CSV</button></div>
+  <div class="card" style="overflow-x:auto" id="ivT"></div>
+  <div class="m">คงเหลือ = รับซื้อ (บิลที่จ่ายเงินแล้ว) + แยกได้ − ใช้แยก − ขายออก ± ปรับยอด · ต้นทุนเป็นถัวเฉลี่ยเคลื่อนที่ · ติดลบ = ขายหรือแยกเกินยอดในระบบ (ลองนับ/ปรับยอด)</div>`;
+  stockTable()}
+ function stockRows(){const q=I.q.trim().toLowerCase();
+  return P.filter(p=>{if(q&&!(p.name+' '+p.code+' '+p.cat).toLowerCase().includes(q))return false;const s=sOf(p.id);
+   return !I.hide0||(Math.abs(s.recv)+Math.abs(s.pin)+Math.abs(s.pout)+Math.abs(s.sale)+Math.abs(s.adj))>0.0005})}
+ function stockTable(){const el=$('ivT');if(!el)return;const R=stockRows();let tk=0,tv=0;
+  el.innerHTML='<table class="iv-t"><tr><th>สินค้า</th><th class="n">รับซื้อ</th><th class="n">แยกได้ +</th><th class="n">ใช้แยก −</th><th class="n">ขายออก −</th><th class="n">ปรับ ±</th><th class="n">คงเหลือ (กก.)</th><th class="n">ต้นทุน/กก.</th><th class="n">มูลค่า ฿</th><th></th></tr>'+
+  (R.map(p=>{const s=sOf(p.id);tk+=s.kg;tv+=s.val;
+   return `<tr><td style="background:${esc(pcol(p))};color:#2b2b2b;font-weight:600">${esc(p.name)}<div style="font-weight:400;font-size:12px">${esc(p.cat)}</div></td><td class="n">${nz(s.recv)}</td><td class="n">${nz(s.pin)}</td><td class="n">${nz(s.pout)}</td><td class="n">${nz(s.sale)}</td><td class="n">${nz(s.adj)}</td><td class="n"${s.kg<-0.0005?' style="color:#dc2626;font-weight:700"':' style="font-weight:700"'}>${k3(s.kg)}</td><td class="n">${s.kg>0.0005?f2(s.avg):'<span class="m">-</span>'}</td><td class="n">${f2(s.val)}</td><td style="white-space:nowrap"><button class="ic ed" data-act="proc" data-p="${esc(p.id)}" title="เอาไปแยกชิ้น" aria-label="แยกชิ้น">🔧</button> <button class="ic ed" data-act="sale" data-p="${esc(p.id)}" title="ขายออก" aria-label="ขายออก">💰</button></td></tr>`}).join('')||'<tr><td colspan="10" class="m">ไม่มีรายการ</td></tr>')+
+  `<tr><th>รวม (${R.length})</th><th colspan="5"></th><th class="n">${k3(tk)}</th><th></th><th class="n">${f2(tv)}</th><th></th></tr></table>`}
+ function stockCsv(){const R=[['รหัส','สินค้า','หมวด','รับซื้อ','แยกได้','ใช้แยก','ขายออก','ปรับ','คงเหลือ(กก.)','ต้นทุน/กก.','มูลค่า']];
+  stockRows().forEach(p=>{const s=sOf(p.id);R.push([p.code,p.name,p.cat,r3(s.recv),r3(s.pin),r3(s.pout),r3(s.sale),r3(s.adj),s.kg,r2(s.avg),r2(s.val)])});
+  dl('stock_'+today()+'.csv','\ufeff'+R.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n'),'text/csv')}
+
+ // ---------- 2) แยกชิ้น / แปรสภาพ ----------
+ const RK='mk_inv_recipe',recipe=()=>{try{return JSON.parse(localStorage.getItem(RK)||'{}')}catch(e){return{}}};
+ function applyRecipe(){const r=recipe()[key(I.pr.src)];if(r&&r.length)I.pr.outs=r.map(pid=>({pid,kg:''}))}
+ function prCalc(){const s=I.pr,S_=s.src?sOf(s.src):null,kg=num(s.kg),
+   outs=s.outs.filter(o=>o.pid&&num(o.kg)>0),avg=S_?S_.avg:0,srcVal=r2(kg*avg),labor=Math.max(0,num(s.labor)),pool=r2(srcVal+labor),
+   sum=r3(outs.reduce((a,o)=>a+num(o.kg),0)),loss=r3(kg-sum),
+   useV=s.alloc=='value'&&outs.length>0&&outs.every(o=>{const p=prod(o.pid);return p&&p.price>0}),
+   w=outs.map(o=>useV?num(o.kg)*prod(o.pid).price:num(o.kg)),W=w.reduce((a,b)=>a+b,0);
+  let left=pool;const vals=outs.map((o,i)=>{const v=i==outs.length-1?left:r2(pool*(W?w[i]/W:0));left=r2(left-v);return v});
+  return{kg,avg,srcVal,labor,pool,sum,loss,outs,vals,useV,S_}}
+ function pProc(b){const s=I.pr;
+  b.innerHTML=`<div class="card"><b style="font-size:17px">🔧 แยกชิ้น / แปรสภาพ</b>
+  <div class="m">ใช้เมื่อเอาของที่รับซื้อมาแกะ/แยก/คัด เป็นของอื่น เช่น มอเตอร์ → ทองแดง + อลูมิเนียม + เหล็ก ระบบจะตัดสต็อกต้นทาง เพิ่มสต็อกผลผลิต และยกต้นทุนไปให้ผลผลิตอัตโนมัติ ส่วนที่หายไป (เศษ/สิ่งเจือปน) นับเป็นสูญเสีย · ผลผลิตต้องมีเป็น "สินค้า" ในเมนู สินค้า/ราคา ก่อน</div>
+  <div class="g" style="margin-top:8px"><div><label>วันที่</label><input type="date" data-k="pr_date" value="${esc(s.date)}"></div><div style="grid-column:span 2"><label>หมายเหตุ/ล็อต (ถ้ามี)</label><input data-k="pr_note" value="${esc(s.note)}" placeholder="เช่น มอเตอร์ล็อต 12/11"></div></div></div>
+  <div class="card"><b>① ของที่เอามาแยก (ต้นทาง)</b>
+   <div class="row" style="align-items:end;margin-top:6px"><div style="flex:3;min-width:200px"><label>สินค้าต้นทาง</label><select data-k="pr_src">${optsH(s.src)}</select></div><div><label>น้ำหนักที่ใช้แยก (กก.)</label><input data-k="pr_kg" inputmode="decimal" value="${esc(s.kg)}" placeholder="0.00"></div></div><div id="prInfo" class="m" style="margin-top:6px"></div></div>
+  <div class="card"><b>② ของที่ได้จากการแยก (ผลผลิต)</b>
+   ${s.outs.map((o,i)=>`<div class="row" style="align-items:end;margin-top:6px"><div style="flex:3;min-width:180px"><label>สินค้าที่ได้ ${i+1}</label><select data-k="po" data-i="${i}" data-f="pid">${optsH(o.pid)}</select></div><div><label>น้ำหนัก (กก.)</label><input data-k="po" data-i="${i}" data-f="kg" inputmode="decimal" value="${esc(o.kg)}" placeholder="0.00"></div><button class="ic del" data-rm="${i}" aria-label="ลบแถว" style="flex:0 0 40px">✕</button></div>`).join('')}
+   <button class="addp" data-add="1" style="margin-top:8px">➕ เพิ่มผลผลิต</button></div>
+  <div class="card"><b>③ ต้นทุน</b><div class="g" style="margin-top:6px"><div><label>แบ่งต้นทุนให้ผลผลิตตาม</label><select data-k="pr_alloc"><option value="value">มูลค่า (น้ำหนัก × ราคาตั้ง) — แนะนำ</option><option value="weight">น้ำหนัก</option></select></div><div><label>ค่าแรง/ค่าใช้จ่ายในการแยก (บาท) ถ้ามี</label><input data-k="pr_labor" inputmode="decimal" value="${esc(s.labor)}" placeholder="0"></div></div><div id="prPrev" style="margin-top:10px"></div></div>
+  <div class="card row"><button data-clr="pr">ล้างฟอร์ม</button><button class="pri" data-save="pr" style="flex:2;font-size:18px">💾 บันทึกการแยกชิ้น</button></div>`;
+  b.querySelector('[data-k="pr_alloc"]').value=s.alloc;prRefresh()}
+ function prRefresh(){const c=prCalc(),i1=$('prInfo'),pv=$('prPrev');if(!i1||!pv)return;
+  i1.innerHTML=c.S_?`คงเหลือ <b>${k3(c.S_.kg)}</b> กก. · ต้นทุนเฉลี่ย <b>฿${f2(c.avg)}</b>/กก.${c.kg>0?` · ต้นทุนของที่ใช้แยก <b>฿${f2(c.srcVal)}</b>`:''}${c.kg>c.S_.kg+0.0005?' <b style="color:#dc2626">⚠ มากกว่าสต็อกคงเหลือ</b>':''}`:'เลือกสินค้าต้นทาง';
+  const rows=c.outs.map((o,i)=>`<tr><td>${esc(pname(o.pid))}</td><td class="n">${k3(num(o.kg))}</td><td class="n">${f2(c.vals[i])}</td><td class="n">${f2(c.vals[i]/num(o.kg))}</td></tr>`).join('');
+  pv.innerHTML=`<div class="res"><div class="row2"><span>ใช้แยก</span><b>${k3(c.kg)} กก.</b></div><div class="row2"><span>ได้ผลผลิตรวม</span><b>${k3(c.sum)} กก.</b></div><div class="row2"><span>สูญเสีย/เศษ</span><b style="color:${c.loss<-0.0005?'#dc2626':'inherit'}">${k3(c.loss)} กก.${c.kg>0?' ('+(c.loss/c.kg*100).toFixed(1)+'%)':''}</b></div><div class="row2"><span>ต้นทุนรวมที่แบ่ง</span><b>฿${f2(c.pool)}</b></div></div>`+
+   (rows?`<table style="margin-top:8px"><tr><th>ผลผลิต</th><th class="n">กก.</th><th class="n">ต้นทุน ฿</th><th class="n">฿/กก.</th></tr>${rows}</table>`:'')+
+   (c.sum>c.kg+0.0005&&c.kg>0?'<div style="color:#dc2626;margin-top:6px">⚠ น้ำหนักผลผลิตรวมมากกว่าที่ใช้แยก ตรวจตัวเลขอีกครั้ง</div>':'')+
+   (I.pr.alloc=='value'&&c.outs.length&&!c.useV?'<div class="m" style="margin-top:6px">มีผลผลิตที่ยังไม่ได้ตั้งราคา จึงแบ่งตามน้ำหนักแทน</div>':'')}
+ async function post(type,date,party,note,alloc,moves){
+  const{data,error}=await sb.rpc('stock_post',{p_type:type,p_date:date,p_party:party||'',p_note:note||'',p_alloc:alloc||'',p_moves:moves});
+  if(error)throw new Error(/stock_post/.test(error.message)&&/function|schema cache/i.test(error.message)?'ยังไม่ได้ Run migrate14_stock.sql ใน Supabase':error.message);
+  return data}
+ async function saveProc(){if(I.busy)return;const c=prCalc(),s=I.pr;
+  if(!s.src)return toast('เลือกสินค้าต้นทาง');if(!(c.kg>0))return toast('กรอกน้ำหนักที่ใช้แยก');
+  if(s.outs.some(o=>(o.pid&&!num(o.kg))||(!o.pid&&num(o.kg))))return toast('มีแถวผลผลิตที่กรอกไม่ครบ (ต้องมีทั้งสินค้าและน้ำหนัก)',6000);
+  if(!c.outs.length)return toast('ใส่ผลผลิตอย่างน้อย 1 รายการ');
+  if(c.outs.some(o=>key(o.pid)==key(s.src)))return toast('ผลผลิตซ้ำกับสินค้าต้นทาง');
+  if(c.sum>c.kg+0.0005)return toast('น้ำหนักผลผลิตรวม ('+k3(c.sum)+') มากกว่าที่ใช้แยก ('+k3(c.kg)+')',8000);
+  if(c.kg>c.S_.kg+0.0005&&!await dlg('ใช้แยก '+k3(c.kg)+' กก. แต่สต็อกคงเหลือ '+k3(c.S_.kg)+' กก. — ทำต่อ?',{ok:'ทำต่อ'}))return;
+  const moves=[{product_id:key(s.src),kg:-c.kg,value:-c.srcVal,role:'src'}].concat(c.outs.map((o,i)=>({product_id:key(o.pid),kg:num(o.kg),value:c.vals[i],role:'out'})));
+  const note=(s.note.trim()+(c.labor>0?(s.note.trim()?' · ':'')+'ค่าแรง/ค่าใช้จ่าย ฿'+f2(c.labor):'')).trim();
+  I.busy=true;
+  try{const r=await post('process',s.date||today(),'',note,c.useV?'value':'weight',moves);
+   try{const R=recipe();R[key(s.src)]=c.outs.map(o=>key(o.pid));localStorage.setItem(RK,JSON.stringify(R))}catch(e){}
+   toast('✅ บันทึกการแยกชิ้น '+(r&&r.doc_no||'')+' แล้ว · สูญเสีย '+k3(c.loss)+' กก.',7000);
+   I.pr={src:'',kg:'',labor:'',alloc:s.alloc,date:s.date,note:'',outs:[{pid:'',kg:''},{pid:'',kg:''}]};
+   await load();paint()}
+  catch(e){toast('บันทึกไม่สำเร็จ: '+(e.message||e),9000)}finally{I.busy=false}}
+
+ // ---------- 3) ขายออก ----------
+ function slRows(){return I.sl.rows.map(r=>{const kg=num(r.kg),pr=num(r.price),s=r.pid?sOf(r.pid):null,avg=s?s.avg:0,amt=r2(kg*pr),cost=r2(kg*avg);return{kg,pr,s,avg,amt,cost,profit:r2(amt-cost),ok:!!(r.pid&&kg>0&&pr>0)}})}
+ function pSale(b){const s=I.sl;
+  b.innerHTML=`<div class="card"><b style="font-size:17px">💰 ขายออก (ขายให้โรงงาน/พ่อค้าส่ง)</b><div class="m">ตัดสต็อกตามต้นทุนเฉลี่ย และคำนวณกำไรให้อัตโนมัติ</div>
+  <div class="g" style="margin-top:8px"><div><label>วันที่ขาย</label><input type="date" data-k="sl_date" value="${esc(s.date)}"></div><div><label>ผู้ซื้อ/โรงงาน</label><input data-k="sl_party" value="${esc(s.party)}" placeholder="เช่น โรงหลอมทองแดง"></div><div><label>เลขที่ใบชั่ง/หมายเหตุ</label><input data-k="sl_note" value="${esc(s.note)}"></div></div></div>
+  <div class="card">${s.rows.map((r,i)=>`<div style="padding:8px 0;border-bottom:1px dashed var(--b)"><div class="row" style="align-items:end"><div style="flex:3;min-width:180px"><label>สินค้า ${i+1}</label><select data-k="sr" data-i="${i}" data-f="pid">${optsH(r.pid)}</select></div><div><label>น้ำหนักขาย (กก.)</label><input data-k="sr" data-i="${i}" data-f="kg" inputmode="decimal" value="${esc(r.kg)}" placeholder="0.00"></div><div><label>ราคาขาย (฿/กก.)</label><input data-k="sr" data-i="${i}" data-f="price" inputmode="decimal" value="${esc(r.price)}" placeholder="0.00"></div>${s.rows.length>1?`<button class="ic del" data-rms="${i}" aria-label="ลบแถว" style="flex:0 0 40px">✕</button>`:''}</div><div class="m" id="slh${i}" style="margin-top:4px"></div></div>`).join('')}
+   <button class="addp" data-adds="1" style="margin-top:8px">➕ เพิ่มสินค้า</button></div>
+  <div class="card" id="slPrev"></div>
+  <div class="card row"><button data-clr="sl">ล้างฟอร์ม</button><button class="pri" data-save="sl" style="flex:2;font-size:18px">💾 บันทึกการขาย</button></div>`;
+  slRefresh()}
+ function slRefresh(){const R=slRows();let rev=0,cost=0;
+  R.forEach((x,i)=>{const h=$('slh'+i);if(h)h.innerHTML=I.sl.rows[i].pid?`คงเหลือ <b>${k3(x.s.kg)}</b> กก. · ต้นทุนเฉลี่ย <b>฿${f2(x.avg)}</b>/กก.${x.kg>0&&x.pr>0?` · ยอด <b>฿${f2(x.amt)}</b> · กำไร <b style="color:${x.profit>=0?'#16a34a':'#dc2626'}">฿${f2(x.profit)}</b>`:''}${x.kg>x.s.kg+0.0005?' <b style="color:#dc2626">⚠ มากกว่าสต็อก</b>':''}`:'';
+   if(x.ok){rev+=x.amt;cost+=x.cost}});
+  const p=$('slPrev');if(p)p.innerHTML=`<div class="res"><div class="row2"><span>ยอดขายรวม</span><b>฿${f2(rev)}</b></div><div class="row2"><span>ต้นทุนรวม</span><b>฿${f2(cost)}</b></div><div class="row2 big2"><span>กำไร</span><b style="color:${rev-cost>=0?'var(--p)':'#dc2626'}">฿${f2(rev-cost)}</b></div></div>`}
+ async function saveSale(){if(I.busy)return;const s=I.sl,R=slRows();
+  if(s.rows.some((r,i)=>(r.pid||num(r.kg)||num(r.price))&&!R[i].ok))return toast('มีแถวที่กรอกไม่ครบ (สินค้า น้ำหนัก ราคาขาย)',6000);
+  const L=s.rows.map((r,i)=>({r,x:R[i]})).filter(o=>o.x.ok);if(!L.length)return toast('ยังไม่มีรายการขาย');
+  const need={};L.forEach(o=>{need[key(o.r.pid)]=(need[key(o.r.pid)]||0)+o.x.kg});
+  const short=Object.keys(need).filter(id=>need[id]>sOf(id).kg+0.0005);
+  if(short.length&&!await dlg('สต็อกไม่พอ: '+short.map(id=>pname(id)+' (ขาย '+k3(need[id])+' / เหลือ '+k3(sOf(id).kg)+')').join(', ')+' — ทำต่อ?',{ok:'ทำต่อ'}))return;
+  const moves=L.map(o=>({product_id:key(o.r.pid),kg:-o.x.kg,value:-o.x.cost,sale_amount:o.x.amt,role:'sale'}));
+  I.busy=true;
+  try{const r=await post('sale',s.date||today(),s.party.trim(),s.note.trim(),'',moves);
+   toast('✅ บันทึกการขาย '+(r&&r.doc_no||'')+' แล้ว · กำไร ฿'+f2(L.reduce((a,o)=>a+o.x.profit,0)),7000);
+   I.sl={date:s.date,party:'',note:'',rows:[{pid:'',kg:'',price:''}]};await load();paint()}
+  catch(e){toast('บันทึกไม่สำเร็จ: '+(e.message||e),9000)}finally{I.busy=false}}
+
+ // ---------- 4) นับสต็อก / ปรับยอด (แอดมิน) ----------
+ function pAdj(b){const a=I.ad;
+  b.innerHTML=`<div class="card"><b style="font-size:17px">⚖ นับสต็อก / ปรับยอด</b><div class="m">กรอก "นับจริง" เฉพาะสินค้าที่นับแล้ว ระบบคำนวณผลต่างและปรับยอดให้ — ใช้ตั้งยอดยกมาตอนเริ่มใช้ระบบ หรือแก้ยอดที่คลาดเคลื่อน · ต้นทุน/กก. ใช้เฉพาะกรณีเพิ่มยอด (ว่าง = ใช้ต้นทุนเฉลี่ย/ราคาตั้ง)</div>
+  <div class="g" style="margin-top:8px"><div><label>เหตุผล</label><select data-k="ad_reason">${REASONS.map(r=>`<option${r==a.reason?' selected':''}>${esc(r)}</option>`).join('')}</select></div><div style="grid-column:span 2"><label>หมายเหตุ</label><input data-k="ad_note" value="${esc(a.note)}" placeholder="เช่น นับสต็อกประจำเดือน"></div></div></div>
+  <div class="card row" style="align-items:center"><input data-k="ad_q" placeholder="🔍 ค้นหาชื่อ/รหัส/หมวด" value="${esc(a.q)}"></div>
+  <div class="card" style="overflow-x:auto" id="adT"></div>
+  <div class="card row" style="align-items:center"><div id="adSum" style="flex:3"></div><button class="pri" data-save="ad" style="flex:2;font-size:18px">💾 บันทึกปรับยอด</button></div>`;
+  adTable()}
+ function adTable(){const el=$('adT');if(!el)return;const q=I.ad.q.trim().toLowerCase(),R=P.filter(p=>!q||(p.name+' '+p.code+' '+p.cat).toLowerCase().includes(q));
+  el.innerHTML='<table class="iv-t"><tr><th>สินค้า</th><th class="n">ในระบบ (กก.)</th><th class="n">นับจริง (กก.)</th><th class="n">ผลต่าง</th><th class="n">ต้นทุน/กก. (เพิ่มยอด)</th></tr>'+
+  R.map(p=>{const id=key(p.id),s=sOf(p.id);
+   return `<tr data-p="${esc(id)}"><td style="background:${esc(pcol(p))};color:#2b2b2b;font-weight:600">${esc(p.name)}<div style="font-weight:400;font-size:12px">${esc(p.cat)}</div></td><td class="n">${k3(s.kg)}</td><td class="n"><input data-k="av" data-p="${esc(id)}" inputmode="decimal" value="${esc(I.ad.vals[id]==null?'':I.ad.vals[id])}" style="width:110px;text-align:right"></td><td class="n dif"></td><td class="n"><input data-k="ac" data-p="${esc(id)}" inputmode="decimal" value="${esc(I.ad.costs[id]==null?'':I.ad.costs[id])}" placeholder="${f2(s.avg>0?s.avg:p.price)}" style="width:90px;text-align:right"></td></tr>`}).join('')+'</table>';
+  el.querySelectorAll('tr[data-p]').forEach(adRow);adSum()}
+ function adRow(tr){const id=tr.dataset.p,v=I.ad.vals[id],c=tr.querySelector('.dif');if(!c)return;
+  if(v==null||v===''){c.textContent='';return}
+  const d=r3(num(v)-sOf(id).kg);c.innerHTML=Math.abs(d)<0.0005?'<span class="m">เท่าเดิม</span>':`<b style="color:${d>0?'#16a34a':'#dc2626'}">${d>0?'+':''}${k3(d)}</b>`}
+ function adChanges(){return P.map(p=>{const id=key(p.id),v=I.ad.vals[id];if(v==null||v==='')return null;const s=sOf(id),d=r3(num(v)-s.kg);if(Math.abs(d)<0.0005)return null;
+  const cost=d>0?(num(I.ad.costs[id])||(s.avg>0?s.avg:p.price)):s.avg;return{p,id,d,value:r2(d*cost)}}).filter(Boolean)}
+ function adSum(){const e=$('adSum');if(!e)return;const C=adChanges(),up=C.filter(x=>x.d>0).reduce((a,x)=>a+x.d,0),dn=C.filter(x=>x.d<0).reduce((a,x)=>a+x.d,0);
+  e.innerHTML=C.length?`ปรับ <b>${C.length}</b> รายการ · เพิ่ม <b style="color:#16a34a">+${k3(up)}</b> · ลด <b style="color:#dc2626">${k3(dn)}</b> กก. · มูลค่า <b>฿${f2(C.reduce((a,x)=>a+x.value,0))}</b>`:'<span class="m">ยังไม่มีรายการที่ต้องปรับ</span>'}
+ async function saveAdj(){if(I.busy)return;const a=I.ad,C=adChanges();
+  if(!C.length)return toast('ยังไม่มีรายการที่ต้องปรับ');if(a.reason=='อื่นๆ'&&!a.note.trim())return toast('เลือก "อื่นๆ" ต้องระบุหมายเหตุ');
+  if(!await dlg('ยืนยันปรับยอดสต็อก '+C.length+' รายการ? (ย้อนได้โดยยกเลิกเอกสารในเมนูประวัติ)',{ok:'ยืนยัน'}))return;
+  const moves=C.map(x=>({product_id:x.id,kg:x.d,value:x.value,role:'adj'}));I.busy=true;
+  try{const r=await post('adjust',today(),'',a.reason+(a.note.trim()?' — '+a.note.trim():''),'',moves);
+   toast('✅ ปรับยอดแล้ว '+(r&&r.doc_no||'')+' ('+C.length+' รายการ)',6000);I.ad.vals={};I.ad.costs={};await load();paint()}
+  catch(e){toast('บันทึกไม่สำเร็จ: '+(e.message||e),9000)}finally{I.busy=false}}
+
+ // ---------- 5) ประวัติ ----------
+ function docHtml(d){const t=TY[d.doc_type]||['','',''],M=d.stock_moves||[],vd=d.status=='void';let body='';
+  if(d.doc_type=='process'){const src=M.find(m=>m.role=='src'),outs=M.filter(m=>m.role=='out'),sk=src?-(+src.kg):0,ok=outs.reduce((a,m)=>a+(+m.kg),0),loss=sk-ok;
+   body=`<div><b>${esc(src?pname(src.product_id):'-')}</b> ${k3(sk)} กก. <span class="m">(ต้นทุน ฿${f2(src?-(+src.value):0)})</span> →</div><table style="margin-top:4px"><tr><th>ผลผลิต</th><th class="n">กก.</th><th class="n">ต้นทุน ฿</th></tr>${outs.map(m=>`<tr><td>${esc(pname(m.product_id))}</td><td class="n">${k3(+m.kg)}</td><td class="n">${f2(+m.value)}</td></tr>`).join('')}</table><div class="m">สูญเสีย ${k3(loss)} กก.${sk>0?' ('+(loss/sk*100).toFixed(1)+'%)':''}</div>`}
+  else if(d.doc_type=='sale'){let rev=0,cost=0;
+   body=`<table><tr><th>สินค้า</th><th class="n">กก.</th><th class="n">฿/กก.</th><th class="n">ยอดขาย</th><th class="n">กำไร</th></tr>${M.map(m=>{const kg=-(+m.kg),amt=+m.sale_amount||0,c=-(+m.value);rev+=amt;cost+=c;return `<tr><td>${esc(pname(m.product_id))}</td><td class="n">${k3(kg)}</td><td class="n">${kg?f2(amt/kg):'-'}</td><td class="n">${f2(amt)}</td><td class="n">${f2(amt-c)}</td></tr>`}).join('')}<tr><th colspan="3">รวม</th><th class="n">${f2(rev)}</th><th class="n">${f2(rev-cost)}</th></tr></table>`}
+  else body=`<table><tr><th>สินค้า</th><th class="n">ปรับ (กก.)</th><th class="n">มูลค่า ฿</th></tr>${M.map(m=>`<tr><td>${esc(pname(m.product_id))}</td><td class="n" style="color:${+m.kg>=0?'#16a34a':'#dc2626'}">${+m.kg>0?'+':''}${k3(+m.kg)}</td><td class="n">${f2(+m.value)}</td></tr>`).join('')}</table>`;
+  return `<div class="card" style="${vd?'opacity:.6;':''}border-left:6px solid ${t[2]}"><div class="row" style="align-items:center"><div style="flex:3"><b>${esc(d.doc_no)}</b> <span class="bd" style="background:${t[2]}">${t[0]} ${t[1]}</span>${vd?' <span class="bd void">ยกเลิก</span>':''}<div class="m">${esc(thD(d.doc_date))}${d.party?' · '+esc(d.party):''} · โดย ${esc(NAMES[d.created_by]||'-')}${d.note?'<br>'+esc(d.note):''}${vd?'<br><b>ยกเลิกเพราะ:</b> '+esc(d.void_reason||'-'):''}</div></div>${adm&&!vd?`<button class="dan" data-void="${esc(d.id)}" style="flex:0 0 auto">ยกเลิกเอกสาร</button>`:''}</div><div style="margin-top:6px;overflow-x:auto">${body}</div></div>`}
+ function pHist(b){const h=I.h,act=h.docs.filter(d=>d.status=='active'&&d.doc_type=='sale');let rev=0,cost=0;
+  act.forEach(d=>(d.stock_moves||[]).forEach(m=>{rev+=+m.sale_amount||0;cost+=-(+m.value)}));
+  b.innerHTML=`<div class="card row" style="align-items:end"><div><label>ตั้งแต่</label><input type="date" data-k="h_from" value="${esc(h.from)}"></div><div><label>ถึง</label><input type="date" data-k="h_to" value="${esc(h.to)}"></div><div><label>ประเภท</label><select data-k="h_type"><option value="">ทั้งหมด</option><option value="process">แยกชิ้น/แปรสภาพ</option><option value="sale">ขายออก</option>${adm?'<option value="adjust">ปรับยอด</option>':''}</select></div></div>
+  ${act.length?`<div class="stats"><div class="stat"><span class="m">ยอดขายในช่วงนี้ (฿)</span><b>${f2(rev)}</b></div><div class="stat"><span class="m">ต้นทุน (฿)</span><b>${f2(cost)}</b></div><div class="stat"><span class="m">กำไร (฿)</span><b style="color:${rev-cost>=0?'#16a34a':'#dc2626'}">${f2(rev-cost)}</b></div></div>`:''}
+  ${h.err?`<div class="card" style="color:var(--d)">โหลดไม่ได้: ${esc(h.err)}</div>`:''}${h.docs.map(docHtml).join('')||'<div class="card m">ไม่มีเอกสารในช่วงนี้</div>'}`;
+  b.querySelector('[data-k="h_type"]').value=h.type}
+ async function voidDoc(id){const d=I.h.docs.find(x=>x.id==id);if(!d)return;
+  const r=await dlg('ยกเลิกเอกสาร '+d.doc_no+'? สต็อกจะกลับเป็นเหมือนไม่เคยทำรายการนี้ (ต้องระบุเหตุผล)',{input:true,ok:'ยกเลิกเอกสาร',danger:true});if(!r)return;
+  const{error}=await sb.rpc('stock_void',{p_id:id,p_reason:r});if(error)return toast('ไม่สำเร็จ: '+error.message,8000);
+  toast('ยกเลิกเอกสารแล้ว',4000);await loadHist();await load();paint()}
+
+ // ---------- events ----------
+ function onClick(e){const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+  if(d.iv){I.tab=d.iv;document.querySelectorAll('#ivTabs [data-iv]').forEach(x=>x.classList.toggle('on',x.dataset.iv==I.tab));
+   if(I.tab=='hist'){loadHist().then(paint)}else{load().then(paint)}return}
+  if(d.retry){rInv();return}
+  if(d.csv){stockCsv();return}
+  if(d.act){const id=d.p;
+   if(d.act=='proc'){I.pr.src=id;applyRecipe();I.tab='process'}else{I.sl.rows[0]=Object.assign({},I.sl.rows[0],{pid:id});I.tab='sale'}
+   document.querySelectorAll('#ivTabs [data-iv]').forEach(x=>x.classList.toggle('on',x.dataset.iv==I.tab));paint();return}
+  if(d.add){I.pr.outs.push({pid:'',kg:''});paint();return}
+  if(d.rm!=null){I.pr.outs.splice(+d.rm,1);if(!I.pr.outs.length)I.pr.outs.push({pid:'',kg:''});paint();return}
+  if(d.adds){I.sl.rows.push({pid:'',kg:'',price:''});paint();return}
+  if(d.rms!=null){I.sl.rows.splice(+d.rms,1);paint();return}
+  if(d.clr=='pr'){I.pr={src:'',kg:'',labor:'',alloc:I.pr.alloc,date:today(),note:'',outs:[{pid:'',kg:''},{pid:'',kg:''}]};paint();return}
+  if(d.clr=='sl'){I.sl={date:today(),party:'',note:'',rows:[{pid:'',kg:'',price:''}]};paint();return}
+  if(d.save=='pr')return saveProc();if(d.save=='sl')return saveSale();if(d.save=='ad')return saveAdj();
+  if(d.void)return voidDoc(d.void)}
+ function onIn(e){const t=e.target,k=t.dataset&&t.dataset.k;if(!k)return;const ch=e.type=='change',v=t.type=='checkbox'?t.checked:t.value;
+  switch(k){
+   case 'q':I.q=v;if(!ch)stockTable();break;
+   case 'hide0':if(ch){I.hide0=v;stockTable()}break;
+   case 'pr_date':I.pr.date=v;break;case 'pr_note':I.pr.note=v;break;
+   case 'pr_kg':I.pr.kg=v;prRefresh();break;case 'pr_labor':I.pr.labor=v;prRefresh();break;case 'pr_alloc':I.pr.alloc=v;prRefresh();break;
+   case 'pr_src':if(ch){I.pr.src=v;applyRecipe();paint()}break;
+   case 'po':I.pr.outs[+t.dataset.i][t.dataset.f]=v;if(t.dataset.f=='pid'){if(ch)paint()}else prRefresh();break;
+   case 'sl_date':I.sl.date=v;break;case 'sl_party':I.sl.party=v;break;case 'sl_note':I.sl.note=v;break;
+   case 'sr':I.sl.rows[+t.dataset.i][t.dataset.f]=v;slRefresh();break;
+   case 'ad_reason':I.ad.reason=v;break;case 'ad_note':I.ad.note=v;break;
+   case 'ad_q':I.ad.q=v;if(!ch)adTable();break;
+   case 'av':I.ad.vals[t.dataset.p]=v;adRow(t.closest('tr'));adSum();break;
+   case 'ac':I.ad.costs[t.dataset.p]=v;adSum();break;
+   case 'h_from':case 'h_to':case 'h_type':if(ch){I.h[k.slice(2)]=v;loadHist().then(paint)}break}}
+
+ // ---------- ลงทะเบียนเมนู (ผู้จ่ายเงิน + แอดมิน) ----------
+ const nav=$('nav'),main=document.querySelector('main');
+ if(nav&&main&&!document.querySelector('nav [data-t="inv"]')){
+  const btn='<button data-t="inv">🏭 ตัดส</button>',c=nav.querySelector('[data-t="close"]');
+  if(c)c.insertAdjacentHTML('afterend',btn);else nav.insertAdjacentHTML('beforeend',btn);
+  main.insertAdjacentHTML('beforeend','<section id="inv"></section>');
+  for(const r of['cashier','admin'])if(!TABS[r].includes('inv'))TABS[r].push('inv');TC.inv='#84cc16';
+  if(typeof ME!=='undefined'&&ME)document.querySelectorAll('nav button').forEach(b=>{if(!can(b.dataset.t))b.style.display='none'});
+  nav.addEventListener('click',e=>{if(e.target.closest('button')?.dataset.t=='inv'&&can('inv'))rInv()})}
+ const css=document.createElement('style');css.textContent='nav button[data-t=inv]{--c1:#84cc16}.iv-t td,.iv-t th{white-space:nowrap}.iv-t td:first-child{white-space:normal;min-width:130px}';document.head.appendChild(css);
+})();
+</script>
+
+
+<script>
 // ===== r33 add-on: กันฐานค้าง + หลอดการใช้งานฐานข้อมูล =====
 // วางต่อท้ายสคริปต์สุดท้าย (ต่อจาก r32) และก่อน <script> ของ serviceWorker | ไม่แก้โค้ดเดิม (ลบก้อนนี้ = กลับเป็นเหมือนเดิม)
 // ทำอะไร:
@@ -2704,9 +2977,6 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
  setInterval(paint,2000);addEventListener('online',paint);
 })();
 </script>
-
- 
-
 
 <script>  
 if ('serviceWorker' in navigator) {
