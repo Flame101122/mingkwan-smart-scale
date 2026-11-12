@@ -2538,7 +2538,7 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
  // ---------- ลงทะเบียนเมนู (ผู้จ่ายเงิน + แอดมิน) ----------
  const nav=$('nav'),main=document.querySelector('main');
  if(nav&&main&&!document.querySelector('nav [data-t="inv"]')){
-  const btn='<button data-t="inv">🏭 คลัง/แยกชิ้น</button>',c=nav.querySelector('[data-t="close"]');
+  const btn='<button data-t="inv">🏭 ตัดสต๊อก</button>',c=nav.querySelector('[data-t="close"]');
   if(c)c.insertAdjacentHTML('afterend',btn);else nav.insertAdjacentHTML('beforeend',btn);
   main.insertAdjacentHTML('beforeend','<section id="inv"></section>');
   for(const r of['cashier','admin'])if(!TABS[r].includes('inv'))TABS[r].push('inv');TC.inv='#84cc16';
