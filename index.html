@@ -2978,6 +2978,94 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+ <script>
+// ===== r34 add-on: เมนู "ชั่งรถ (กิโลใหญ่)" แก้น้ำหนักตรง ๆ ได้ + เคอร์เซอร์เด้งพร้อมพิมพ์ เหมือนเมนู "ชั่ง/รับซื้อ" =====
+// วางต่อท้ายสคริปต์ r33 และก่อน <script> ของ serviceWorker (ไม่แก้โค้ดเดิม; ลบก้อนนี้ทิ้ง = กลับเป็นเหมือนเดิม)
+// 1) ช่องกรอกน้ำหนักรถหนัก/รถเบา (หน้าต่าง numDlg): เคอร์เซอร์เด้งทันที, มือถือเรียกแป้นตัวเลขของเครื่อง (inputmode=decimal),
+//    พิมพ์ได้เฉพาะ 0-9 และจุดเดียว, กด Enter = ตกลง, ปุ่มตัวเลขบนหน้าจอยังใช้ได้เหมือนเดิม
+// 2) กด ✏️ ที่รายการชั่งรถ -> มีปุ่มใหม่ "✏️ แก้น้ำหนัก/ราคา (พิมพ์ตรง)" แก้ รถหนัก / รถเบา / หักน้ำหนัก / ราคา ได้ในหน้าต่างเดียว
+//    เห็นน้ำหนักสุทธิและยอดเงินคำนวณสดระหว่างพิมพ์ (ราคาที่แก้มีผลเฉพาะบิลนี้ ไม่เปลี่ยนราคามาตรฐานสินค้า)
+(function(){
+ if(window.__mk34)return;window.__mk34=1;
+ const phone=()=>{try{return typeof isPhone=='function'?isPhone():/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent)}catch(e){return false}};
+ const clean=s=>{s=String(s||'').replace(/,/g,'.').replace(/[^\d.]/g,'');const i=s.indexOf('.');return i<0?s:s.slice(0,i+1)+s.slice(i+1).replace(/\./g,'')};
+ const toEnd=el=>{try{const n=el.value.length;el.setSelectionRange(n,n)}catch(e){}};
+
+ // ---------- ช่วยให้ช่องตัวเลขพิมพ์ได้เฉพาะ 0-9 และจุด ----------
+ function numField(el,onEnter){
+  if(el.dataset.mk34)return;el.dataset.mk34='1';
+  el.setAttribute('autocomplete','off');el.setAttribute('enterkeyhint','done');
+  el.addEventListener('beforeinput',e=>{
+   if(e.inputType!='insertText'||e.data==null)return;
+   if(/^[0-9]+$/.test(e.data))return;
+   e.preventDefault();
+   if((e.data=='.'||e.data==',')&&!el.value.includes('.')){
+    const a=el.selectionStart==null?el.value.length:el.selectionStart,b=el.selectionEnd==null?a:el.selectionEnd;
+    el.setRangeText(el.value===''&&a==b?'0.':'.',a,b,'end');
+    el.dispatchEvent(new Event('input',{bubbles:true}))}});
+  el.addEventListener('input',()=>{const c=clean(el.value);if(c!==el.value){el.value=c;toEnd(el)}});
+  el.addEventListener('keydown',e=>{if(e.key=='Enter'){e.preventDefault();onEnter&&onEnter()}});}
+
+ // ---------- 1) หน้าต่างกรอกน้ำหนักรถหนัก/เบา: เคอร์เซอร์เด้ง + แป้นตัวเลขมือถือ ----------
+ function fixNd(d){
+  const inp=d.querySelector('input.nd');if(!inp||inp.dataset.mk34)return;
+  inp.setAttribute('inputmode',phone()?'decimal':'none'); // มือถือ: แป้นตัวเลขของเครื่อง / คอม-จอสัมผัส: ใช้ปุ่มตัวเลขในหน้าต่าง
+  numField(inp,()=>d.querySelector('.b2')?.click());
+  const go=()=>{if(!d.isConnected||!d.open)return;try{inp.focus({preventScroll:true});toEnd(inp)}catch(e){}};
+  go();setTimeout(go,250);setTimeout(go,900); // numDlg เปิดกล้องก่อน จึงย้ำโฟกัสอีกครั้งหลังกล้องพร้อม
+ }
+ new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes)if(n instanceof HTMLDialogElement)fixNd(n)}).observe(document.body,{childList:true});
+
+ // ---------- 2) หน้าต่างแก้น้ำหนัก/ราคาของรายการชั่งรถ ----------
+ function directEdit(i){
+  const l=cur.lines[i];if(!l||l.kind!='truck')return;
+  const d=document.createElement('dialog');
+  d.style.cssText='max-width:440px;width:94%;border-radius:14px;background:var(--c);color:var(--t)';
+  const v=x=>x==null?'':String(x);
+  d.innerHTML=`<b style="font-size:20px">✏️ แก้น้ำหนัก/ราคา: ${esc(l.name)}</b>
+  <div class="m" style="margin:4px 0 8px">พิมพ์ตัวเลขได้เลย · ราคาที่แก้มีผลเฉพาะบิลนี้ ไม่เปลี่ยนราคามาตรฐานสินค้า · เว้นรถเบาว่างไว้ = ยังรอชั่งรถเบา</div>
+  <div class="g" style="grid-template-columns:1fr 1fr">
+   <div><label>น้ำหนักรถหนัก (กก.)</label><input id="e34h" type="number" step="0.01" min="0" inputmode="decimal" value="${v(l.heavy)}" style="font-size:22px;font-weight:700"></div>
+   <div><label>น้ำหนักรถเบา (กก.)</label><input id="e34l" type="number" step="0.01" min="0" inputmode="decimal" value="${v(l.light)}" style="font-size:22px;font-weight:700"></div>
+   <div><label>หักน้ำหนัก (กก.)</label><input id="e34d" type="number" step="0.01" min="0" inputmode="decimal" value="${v(l.deduct||0)}"></div>
+   <div><label>ราคา (บาท/กก.)</label><input id="e34p" type="number" step="0.01" min="0" inputmode="decimal" value="${v(l.price)}"></div></div>
+  <div class="res"><div class="row2"><span>น้ำหนักสุทธิ</span><b id="e34n">-</b></div><div class="row2"><span>เป็นเงิน</span><b id="e34a" style="color:var(--p)">-</b></div></div>
+  <div class="row" style="margin-top:10px"><button class="c">ยกเลิก</button><button class="pri s" style="flex:2">💾 บันทึก</button></div>`;
+  document.body.appendChild(d);d.showModal();
+  const g=id=>d.querySelector('#'+id),H=g('e34h'),L=g('e34l'),D=g('e34d'),Pp=g('e34p');
+  const calcE=()=>{const h=parseFloat(H.value)||0,hasL=L.value!=='',lt=parseFloat(L.value)||0,dd=parseFloat(D.value)||0,p=parseFloat(Pp.value)||0;
+   if(!hasL){g('e34n').textContent='รอชั่งรถเบา';g('e34a').textContent='-';return}
+   const net=r2(h-lt-dd);g('e34n').textContent=f2(net)+' กก.';g('e34n').style.color=net>0?'':'#dc2626';g('e34a').textContent=net>0?'฿'+f2(r2(net*p)):'-'};
+  const save=()=>{
+   const h=parseFloat(H.value),hasL=L.value!=='',lt=parseFloat(L.value),dd=parseFloat(D.value)||0,p=parseFloat(Pp.value);
+   if(!(h>0))return toast('กรอกน้ำหนักรถหนักให้ถูกต้อง');
+   if(!(p>0))return toast('ราคาต่อกิโลต้องมากกว่า 0');
+   if(dd<0)return toast('น้ำหนักหักต้องไม่ติดลบ');
+   if(hasL){
+    if(!(lt>=0))return toast('กรอกน้ำหนักรถเบาให้ถูกต้อง');
+    if(lt>=h)return toast('น้ำหนักรถเบาต้องน้อยกว่ารถหนัก ('+f2(h)+')');
+    const net=r2(h-lt-dd);if(!(net>0))return toast('น้ำหนักสุทธิต้องมากกว่า 0');
+    l.light=lt;l.deduct=dd;l.net=net;l.amount=r2(net*p);
+   }else{l.light=null;l.pl=null;l.plx=[];l.deduct=0;l.net=null;l.amount=null}
+   l.heavy=h;l.price=p;d.remove();rLines();toast('แก้ไขรายการชั่งรถแล้ว')};
+  [H,L,D,Pp].forEach((el,k,A)=>{numField(el,()=>{k<A.length-1?(A[k+1].focus(),toEnd(A[k+1])):save()});el.addEventListener('input',calcE)});
+  d.querySelector('.c').onclick=()=>d.remove();d.oncancel=()=>d.remove();d.querySelector('.s').onclick=save;
+  calcE();
+  const f=()=>{try{H.focus({preventScroll:true});toEnd(H)}catch(e){}};f();setTimeout(f,200)}
+ window.mkTruckDirectEdit=directEdit;
+
+ // ---------- เพิ่มปุ่มในเมนู ✏️ ของรายการชั่งรถ (ไม่แก้ editTruck เดิม) ----------
+ const et0=window.editTruck;
+ window.editTruck=function(i){
+  const r=et0.apply(this,arguments);
+  try{const ds=document.querySelectorAll('dialog[open]'),d=ds[ds.length-1],a1=d&&d.querySelector('.a1');
+   if(a1&&!d.querySelector('.mk34b')){
+    a1.insertAdjacentHTML('beforebegin','<button class="mk34b bt-blue">✏️ แก้น้ำหนัก/ราคา (พิมพ์ตรง)</button>');
+    d.querySelector('.mk34b').onclick=()=>{d.remove();directEdit(i)}}}catch(e){console.warn('[r34]',e)}
+  return r};
+})();
+</script>
+
 <script>  
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
