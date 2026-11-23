@@ -2978,13 +2978,11 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
- <script>
-// ===== r34 add-on: เมนู "ชั่งรถ (กิโลใหญ่)" แก้น้ำหนักตรง ๆ ได้ + เคอร์เซอร์เด้งพร้อมพิมพ์ เหมือนเมนู "ชั่ง/รับซื้อ" =====
+<script>
+// ===== r34 add-on (แก้แล้ว): เมนู "ชั่งรถ (กิโลใหญ่)" แก้น้ำหนักตรง ๆ ได้ + เคอร์เซอร์เด้งพร้อมพิมพ์ =====
 // วางต่อท้ายสคริปต์ r33 และก่อน <script> ของ serviceWorker (ไม่แก้โค้ดเดิม; ลบก้อนนี้ทิ้ง = กลับเป็นเหมือนเดิม)
-// 1) ช่องกรอกน้ำหนักรถหนัก/รถเบา (หน้าต่าง numDlg): เคอร์เซอร์เด้งทันที, มือถือเรียกแป้นตัวเลขของเครื่อง (inputmode=decimal),
-//    พิมพ์ได้เฉพาะ 0-9 และจุดเดียว, กด Enter = ตกลง, ปุ่มตัวเลขบนหน้าจอยังใช้ได้เหมือนเดิม
-// 2) กด ✏️ ที่รายการชั่งรถ -> มีปุ่มใหม่ "✏️ แก้น้ำหนัก/ราคา (พิมพ์ตรง)" แก้ รถหนัก / รถเบา / หักน้ำหนัก / ราคา ได้ในหน้าต่างเดียว
-//    เห็นน้ำหนักสุทธิและยอดเงินคำนวณสดระหว่างพิมพ์ (ราคาที่แก้มีผลเฉพาะบิลนี้ ไม่เปลี่ยนราคามาตรฐานสินค้า)
+// แก้จากเดิม: ช่องในหน้าต่างแก้น้ำหนัก/ราคาเปลี่ยนจาก type="number" เป็น type="text" + inputmode="decimal"
+//             เพราะ setRangeText/setSelectionRange ใช้กับ type="number" ไม่ได้ ทำให้พิมพ์จุดทศนิยมไม่ได้
 (function(){
  if(window.__mk34)return;window.__mk34=1;
  const phone=()=>{try{return typeof isPhone=='function'?isPhone():/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent)}catch(e){return false}};
@@ -2994,6 +2992,8 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
  // ---------- ช่วยให้ช่องตัวเลขพิมพ์ได้เฉพาะ 0-9 และจุด ----------
  function numField(el,onEnter){
   if(el.dataset.mk34)return;el.dataset.mk34='1';
+  // กันพลาด: type="number" ไม่รองรับ selection API -> ปรับเป็น text (แป้นตัวเลขมือถือยังขึ้นด้วย inputmode)
+  if(el.type==='number'){el.type='text';if(!el.getAttribute('inputmode'))el.setAttribute('inputmode','decimal');el.removeAttribute('step');el.removeAttribute('min')}
   el.setAttribute('autocomplete','off');el.setAttribute('enterkeyhint','done');
   el.addEventListener('beforeinput',e=>{
    if(e.inputType!='insertText'||e.data==null)return;
@@ -3025,10 +3025,10 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
   d.innerHTML=`<b style="font-size:20px">✏️ แก้น้ำหนัก/ราคา: ${esc(l.name)}</b>
   <div class="m" style="margin:4px 0 8px">พิมพ์ตัวเลขได้เลย · ราคาที่แก้มีผลเฉพาะบิลนี้ ไม่เปลี่ยนราคามาตรฐานสินค้า · เว้นรถเบาว่างไว้ = ยังรอชั่งรถเบา</div>
   <div class="g" style="grid-template-columns:1fr 1fr">
-   <div><label>น้ำหนักรถหนัก (กก.)</label><input id="e34h" type="number" step="0.01" min="0" inputmode="decimal" value="${v(l.heavy)}" style="font-size:22px;font-weight:700"></div>
-   <div><label>น้ำหนักรถเบา (กก.)</label><input id="e34l" type="number" step="0.01" min="0" inputmode="decimal" value="${v(l.light)}" style="font-size:22px;font-weight:700"></div>
-   <div><label>หักน้ำหนัก (กก.)</label><input id="e34d" type="number" step="0.01" min="0" inputmode="decimal" value="${v(l.deduct||0)}"></div>
-   <div><label>ราคา (บาท/กก.)</label><input id="e34p" type="number" step="0.01" min="0" inputmode="decimal" value="${v(l.price)}"></div></div>
+   <div><label>น้ำหนักรถหนัก (กก.)</label><input id="e34h" type="text" inputmode="decimal" value="${v(l.heavy)}" style="font-size:22px;font-weight:700"></div>
+   <div><label>น้ำหนักรถเบา (กก.)</label><input id="e34l" type="text" inputmode="decimal" value="${v(l.light)}" style="font-size:22px;font-weight:700"></div>
+   <div><label>หักน้ำหนัก (กก.)</label><input id="e34d" type="text" inputmode="decimal" value="${v(l.deduct||0)}"></div>
+   <div><label>ราคา (บาท/กก.)</label><input id="e34p" type="text" inputmode="decimal" value="${v(l.price)}"></div></div>
   <div class="res"><div class="row2"><span>น้ำหนักสุทธิ</span><b id="e34n">-</b></div><div class="row2"><span>เป็นเงิน</span><b id="e34a" style="color:var(--p)">-</b></div></div>
   <div class="row" style="margin-top:10px"><button class="c">ยกเลิก</button><button class="pri s" style="flex:2">💾 บันทึก</button></div>`;
   document.body.appendChild(d);d.showModal();
