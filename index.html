@@ -3066,6 +3066,58 @@ async function autoColorAll(){if(!await dlg('ใส่สีตามหมว�
 })();
 </script>
 
+ <script>
+// ===== r35 add-on: แป้นตัวเลขบนจอ (npad) พิมพ์/ลบ "ตรงช่องที่ผู้ใช้เลือก" =====
+// ช่องที่รองรับ: น้ำหนักรวม, จำนวนภาชนะ, หักเพิ่ม, เจือปน(%), ราคา/กก.
+// วางต่อท้าย r34 และก่อน <script> ของ serviceWorker (ไม่แก้โค้ดเดิม; ลบก้อนนี้ทิ้ง = กลับเป็นเหมือนเดิม)
+(function(){
+ if(window.__mk35)return;window.__mk35=1;
+ const wd=document.getElementById('wd');if(!wd)return;
+ const IDS=['gross','tareQ','tareX','pct','unitPrice'],fld=id=>document.getElementById(id);
+ const phone=()=>{try{return typeof isPhone=='function'?isPhone():/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent)}catch(e){return false}};
+ let target='gross';
+
+ // type="number" ใช้ setRangeText/ตำแหน่งเคอร์เซอร์ไม่ได้ และพิมพ์ "1." ผ่านโค้ดไม่ได้ -> เปลี่ยนเป็น text + inputmode
+ function prep(){IDS.forEach(id=>{const el=fld(id);if(!el)return;
+  if(el.type==='number'){el.type='text';el.removeAttribute('step');el.removeAttribute('min')}
+  el.setAttribute('inputmode',phone()?'decimal':'none'); // จอสัมผัสบนคอม: ใช้ปุ่มตัวเลขในหน้าต่าง ไม่เรียกแป้นพิมพ์ OSK/ระบบ
+  el.setAttribute('autocomplete','off')})}
+ prep();addEventListener('resize',prep);addEventListener('orientationchange',prep);
+
+ // กรองให้พิมพ์ได้เฉพาะ 0-9 และจุด (จุดได้ตัวเดียว) — capture เพื่อให้ทำงานก่อน oninput/calc เดิม
+ wd.addEventListener('input',e=>{const t=e.target;if(!t||!IDS.includes(t.id))return;
+  let s=String(t.value).replace(/,/g,'.').replace(/[^\d.]/g,'');const i=s.indexOf('.');if(i>=0)s=s.slice(0,i+1)+s.slice(i+1).replace(/\./g,'');
+  if(s!==t.value){t.value=s;try{t.setSelectionRange(s.length,s.length)}catch(_){}}},true);
+
+ // ติดตามช่องที่ผู้ใช้แตะล่าสุด + ไฮไลต์
+ function mark(){IDS.forEach(id=>{const el=fld(id);if(el)el.classList.toggle('mk35-on',id===target)})}
+ wd.addEventListener('focusin',e=>{const id=e.target&&e.target.id;if(IDS.includes(id)){target=id;mark()}});
+ wd.addEventListener('close',()=>{target='gross';mark()});
+ // กดปุ่มบนแป้นตัวเลขแล้วไม่ให้ช่องเสียโฟกัส (เคอร์เซอร์อยู่ที่เดิม)
+ wd.addEventListener('mousedown',e=>{if(e.target.closest&&e.target.closest('#npad'))e.preventDefault()});
+ const css=document.createElement('style');css.textContent='.mk35-on{outline:3px solid #2563eb!important;outline-offset:1px;border-color:#2563eb!important}';document.head.appendChild(css);
+ mark();
+
+ // ---------- แทนที่ pad(): แก้ช่องที่เลือก ไม่ใช่ #gross ตายตัว ----------
+ window.pad=function(k){
+  const el=fld(target)||fld('gross');if(!el)return;
+  if(el.id==='gross'){
+   if(SC.lock&&scOn)return toast('โหมดล็อกน้ำหนักเปิดอยู่: ใช้ค่าจากตาชั่งเท่านั้น');
+   gsrc='manual'}
+  if(el.readOnly)return;
+  const v=el.value;let a=el.selectionStart,b=el.selectionEnd;
+  if(document.activeElement!==el||a==null||b==null){a=b=v.length}
+  if(k==='C'){el.value=''}
+  else if(k==='<'){if(a===b)a=Math.max(0,a-1);el.setRangeText('',a,b,'end')}
+  else if(k==='.'){if(v.includes('.')&&!(a!==b&&v.slice(a,b).includes('.')))return;el.setRangeText(v===''?'0.':'.',a,b,'end')}
+  else{ // ตัวเลข
+   if(v==='0'&&a===b&&a===v.length){el.value=k;try{el.setSelectionRange(1,1)}catch(_){}}
+   else el.setRangeText(k,a,b,'end')}
+  el.dispatchEvent(new Event('input',{bubbles:true})); // ให้ calc() เดิมทำงานต่อ
+ };
+})();
+</script>
+
 <script>  
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
